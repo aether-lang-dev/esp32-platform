@@ -1,0 +1,49 @@
+// Copyright (C) 2021 Toitware ApS.
+// Use of this source code is governed by the Zero-Clause BSD license
+// in LICENSE in this directory.
+// Adapted from Toit examples/http/http.toit.
+
+import std.http.client
+import std.io
+import std.string
+
+fail(reason: string) {
+    println(reason)
+    exit(1)
+}
+
+main() {
+    url = io.getenv("TOIT_HTTP_URL")
+    if url == 0 || url == "" {
+        fail("Set TOIT_HTTP_URL to the HTTP URL to read")
+    }
+
+    request = client.request("GET", url)
+    if request == null { fail("Cannot create request") }
+    defer client.request_free(request)
+    timeout_error = client.set_timeout(request, 5s)
+    if timeout_error != "" { fail(timeout_error) }
+    response, err = client.send_stream(request)
+    if err != "" { fail(err) }
+    defer client.response_free(response)
+    status = client.response_status(response)
+    if status < 200 || status >= 300 { fail("HTTP status ${status}") }
+
+    count = 0
+    while true {
+        chunk = client.response_read(response, 4096)
+        if chunk == "" { break }
+        count = count + string.length(chunk)
+    }
+    read_error = client.response_error(response)
+    if read_error != "" { fail(read_error) }
+    length = client.response_header(response, "Content-Length")
+    transfer = client.response_header(response, "Transfer-Encoding")
+    if length != "" && transfer == "" {
+        expected, length_error = string.to_int(length)
+        if length_error != "" || expected != count {
+            fail("Content-Length mismatch")
+        }
+    }
+    println("Read ${count} bytes from ${url}")
+}

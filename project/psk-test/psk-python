@@ -1,0 +1,5 @@
+#!/bin/sh
+set -- /opt/psk/python/bin/python3 "$@"
+for loader in /opt/psk/os/ld-musl-*.so.1; do
+    exec "$loader" --library-path /opt/psk/python/lib:/opt/psk/lib:/opt/psk/os "$@"
+done

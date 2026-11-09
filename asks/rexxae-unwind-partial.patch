@@ -1,0 +1,114 @@
+diff --git a/src/engine.ae b/src/engine.ae
+index e9a0377..5aa4a6a 100644
+--- a/src/engine.ae
++++ b/src/engine.ae
+@@ -389,10 +389,21 @@ abort_cancelled_(ctx: ptr) -> int {
+     state.number(ctx, "status", -1)
+     return -1
+ }
++// Stack slots make ownership transfer explicit without allocating a guard.
++release_context_slot_(slot: ptr) {
++    owned = mem.get_ptr(slot, 0)
++    if owned != null { core_destroy(owned) }
++}
++release_map_slot_(slot: ptr) { map.map_free(mem.get_ptr(slot, 0)) }
++release_atomic_slot_(slot: ptr) {
++    owned = mem.get_ptr(slot, 0)
++    if owned != null { sync.atomic_free(owned) }
++}
+ @pure
+ core_create(source: string) -> ptr {
+     ctx = lex.new(source)
+     if ctx == null { return null }
++    defer release_context_slot_(&ctx)
+     cache = map.map_new()
+     map.map_put_raw(ctx, "cache", cache)
+     state.number(ctx, "status", 3)
+@@ -401,7 +412,9 @@ core_create(source: string) -> ptr {
+     state.write(ctx, "log_name", "")
+     program.compile(ctx)
+     if state.read(ctx, "error") != "" { state.number(ctx, "status", -1) }
+-    return ctx
++    result = ctx
++    ctx = null
++    return result
+ }
+ // Host-only session continuation: copy owned script values and the existing
+ // service registry into a newly parsed program, never private execution state.
+@@ -438,6 +451,14 @@ core_destroy(ctx: ptr) {
+     while i < depth { map.map_free(map.map_get_raw(ctx, cache_key_(i))); i = i + 1 }
+     map.map_free(ctx)
+ }
++// Keep the instruction clone owned through an interrupted evaluation too.
++execute_instruction_(ctx: ptr, pc: int) -> int {
++    inst = state.load(ctx, string.concat("p:", string.from_int(pc)))
++    defer json.json_free(inst)
++    state.number(ctx, "line", state.index(inst, "line"))
++    state.number(ctx, "token_line", state.index(inst, "line"))
++    return execute_(ctx, inst, pc)
++}
+ @pure
+ core_step(ctx: ptr, budget: int) -> int {
+     if ctx == null { return -1 }
+@@ -451,11 +472,7 @@ core_step(ctx: ptr, budget: int) -> int {
+         if cancelled_(ctx) { return abort_cancelled_(ctx) }
+         pc = state.integer(ctx, "pc")
+         if pc >= state.integer(ctx, "program_size") { state.number(ctx, "status", 0); return 0 }
+-        inst = state.load(ctx, string.concat("p:", string.from_int(pc)))
+-        state.number(ctx, "line", state.index(inst, "line"))
+-        state.number(ctx, "token_line", state.index(inst, "line"))
+-        next = execute_(ctx, inst, pc)
+-        json.json_free(inst)
++        next = execute_instruction_(ctx, pc)
+         used = used + 1
+         if state.read(ctx, "error") != "" { unwind_(ctx); state.number(ctx, "status", -1); return -1 }
+         if state.integer(ctx, "status") == 4 { return 4 }
+@@ -626,12 +643,19 @@ inner_(handle: ptr) -> ptr {
+ }
+ wrap_(ctx: @keep ptr) -> ptr {
+     if ctx == null { return null }
++    defer release_context_slot_(&ctx)
+     cell = sync.atomic_new(0)
++    defer release_atomic_slot_(&cell)
+     map.map_put_raw(ctx, "cancel_cell", cell)
+     handle = map.map_new()
++    defer release_map_slot_(&handle)
+     map.map_put_raw(handle, "ctx", ctx)
+     map.map_put_raw(handle, "cancel", cell)
+-    return handle
++    result = handle
++    handle = null
++    cell = null
++    ctx = null
++    return result
+ }
+ @pure
+ rexxae_create(source: string) -> ptr { return wrap_(core_create(source)) }
+diff --git a/src/lex.ae b/src/lex.ae
+index e196027..315ac91 100644
+--- a/src/lex.ae
++++ b/src/lex.ae
+@@ -1,16 +1,22 @@
+ import std.string
+ import std.map
+ import std.strbuilder
++import std.mem
+ import src.state
+ 
+ exports(new, next, symbol, keyword)
+ 
++release_unpublished_(slot: ptr) { map.map_free(mem.get_ptr(slot, 0)) }
++
+ new(source: string) -> ptr {
+     ctx = map.map_new()
++    defer release_unpublished_(&ctx)
+     state.write(ctx, "source", source)
+     state.number(ctx, "scan_line", 1)
+     next(ctx)
+-    return ctx
++    result = ctx
++    ctx = null
++    return result
+ }
+ symbol(ctx: ptr, text: string) -> bool { return state.integer(ctx, "kind") == 3 && state.read(ctx, "token") == text }
+ keyword(ctx: ptr, text: string) -> bool { return state.integer(ctx, "kind") == 1 && string.to_upper(state.read(ctx, "token")) == text }

@@ -1,0 +1,7 @@
+FROM docker.io/library/python:3-alpine AS client
+FROM docker.io/espressif/idf:v6.1
+COPY --from=client /usr/local/ /opt/psk/python/
+COPY --from=client /usr/lib/ /opt/psk/lib/
+COPY --from=client /lib/ /opt/psk/os/
+COPY psk-python /usr/local/bin/psk-python
+ENV REXX_TEST_PYTHON=/usr/local/bin/psk-python

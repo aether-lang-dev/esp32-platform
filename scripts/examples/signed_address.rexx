@@ -1,0 +1,11 @@
+/* Deploy with the signed ADDRESS_LABELS grant. */
+ADDRESS LABELS 'status'
+IF RC <> 0 THEN EXIT RC
+IF RESULT <> 'PEER READY' THEN EXIT 1
+SAY RESULT
+command = 'upper hello from Rexx'
+ADDRESS LABELS command
+IF RC <> 0 THEN EXIT RC
+IF RESULT <> 'HELLO FROM REXX' THEN EXIT 1
+SAY RESULT
+EXIT 0

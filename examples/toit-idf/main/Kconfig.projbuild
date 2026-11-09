@@ -1,0 +1,11 @@
+menu "Toit Wi-Fi example"
+    config TOIT_WIFI_SSID
+        string "Station SSID"
+        default ""
+    config TOIT_WIFI_PASSWORD
+        string "Station password"
+        default ""
+    config TOIT_NTP_SERVER
+        string "NTP server"
+        default "pool.ntp.org"
+endmenu
