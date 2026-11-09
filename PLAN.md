@@ -1,10 +1,10 @@
 # Plan
 
-Where this is going: a **runner** firmware. Native firmware (C and Aether,
-reflashed rarely) owns the hardware and holds the RexxAE engine. Rexx
-scripts are what goes over the air: small, signed, granted only the
-functions their manifest names, held to an instruction budget, and
-stoppable without resetting the chip.
+Where this is going: an **ESP32 platform for device apps**. Board firmware
+owns the hardware and exposes services through host-controlled interfaces.
+The Rexx profile runs small signed scripts with explicit grants and
+execution budgets. The roadmap also covers native Aether firmware and
+investigates independently deployable Aether apps.
 
 Written 2026-11-04 from the 2026-11-03 session, so the strands don't get
 lost. The README has the results so far. Each strand below says what is
@@ -123,7 +123,8 @@ The remaining design follows:
   active fingerprint to skip matching devices and reconciles each device
   against its own version floor.
 - **Planned firmware updates** will use ESP-IDF's two app slots with rollback.
-  16 MB of flash holds two app slots plus the script slots.
+  Check the partition budget on each board, including space for script and
+  peer slots. See the device app roadmap below.
 - **Output:** `SAY` and `LOG_*` go to the serial port or a remote log.
 - **First milestone (done):** the loop plus two mounted functions plus a script
   loaded from a flash partition, all in QEMU. Development HTTP delivery also
@@ -137,6 +138,35 @@ The remaining design follows:
   may also be ported, retaining their licences and original copyright
   holders. Check separate package dependencies independently. See
   [PROVENANCE.md](PROVENANCE.md) for the policy and inspected revision.
+
+### Device app deployment roadmap
+
+1. **Signed Rexx apps and services.** The current CYD path installs signed
+   source in app and peer slots. RexxAE runs inside resident firmware, which
+   verifies releases and decides which host services each app may use.
+2. **Native Aether firmware.** First run a small pure Aether app on the CYD
+   over USB using the board's display and logical switch interfaces. Then
+   add signed firmware deployment with its own trust policy and ESP-IDF
+   A/B boot validation. The acceptance test is a good image promotion and
+   rollback to the prior firmware when a candidate fails validation.
+3. **Hot-loaded Aether apps.** Investigate a Toit-style workflow. Compile
+   off-device, send a signed app artifact, and start the replacement from
+   resident firmware without a board reboot. Choose an artifact format and
+   runtime or loader after measuring flash, RAM, and update latency on the
+   target. The design must establish host-granted service access,
+   compatibility checks against a versioned host ABI, bounded execution,
+   and separate app rollback. The proof is two releases of the same app
+   installed in succession, followed by a rejected or failing release
+   that leaves the previous app callable. First get the CYD onto Wi-Fi
+   and verify signed Rexx watch, activation and rollback over PSK TLS on
+   real hardware. That is the prerequisite for the over-the-air Aether
+   proof. USB can exercise the loader and rollback locally.
+
+Jaguar's development flow is a reference for the third milestone. Its
+host sends a compiled Toit program to the resident VM. Our current native
+Aether build produces a linked firmware image, so the hot-loaded artifact
+format and execution model are open design choices.
+[Jaguar](https://github.com/toitlang/jaguar#how-does-it-work)
 
 ## 5. The Guition board
 

@@ -1,5 +1,8 @@
 # Reuse and provenance
 
+The repository's original code is available under the [MIT license](LICENSE).
+Reused files retain the license terms and attribution documented below.
+
 The Toit reference checkout is `/Users/paul/scm/not-ours/toit`, inspected at
 `ec8860aa25d35e54f5cb3bcd437133054eccae8c`. Treat it as read-only.
 
