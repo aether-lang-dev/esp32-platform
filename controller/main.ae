@@ -1,0 +1,82 @@
+import contrib.tinyweb
+import datastar
+import std.file
+import std.json
+import std.list
+import std.os
+
+const ORIGIN = "127.0.0.1:8787"
+
+fn local_request(req: ptr, res: ptr) -> bool {
+    host = tinyweb.request_get_header(req, "Host")
+    if host != ORIGIN {
+        tinyweb.response_write_status(res, "Unknown controller host", 403)
+        return false
+    }
+    tinyweb.response_set_header(res, "Cache-Control", "no-store")
+    tinyweb.response_set_header(res, "X-Content-Type-Options", "nosniff")
+    tinyweb.response_set_header(res, "X-Frame-Options", "DENY")
+    tinyweb.response_set_header(res, "Referrer-Policy", "no-referrer")
+    return true
+}
+
+fn device_status(device: string, credential: string) -> string {
+    args = list.new()
+    defer list.free(args)
+    list.add(args, "controller/device.py")
+    list.add(args, "--device")
+    list.add(args, device)
+    list.add(args, "--credential")
+    list.add(args, credential)
+    list.add(args, "status")
+    python = os.getenv("REXX_CONTROLLER_PYTHON")
+    if python == "" { python = "python3.13" }
+    output, _code, err = os.run_capture(python, args, null)
+    if err != "" || output == "" {
+        return "{\"connected\":false,\"message\":\"Local transport failed\"}"
+    }
+    return output
+}
+
+main() {
+    if os.args_count() != 3 {
+        println("Usage: controller/run.sh https://device-address /absolute/device.json")
+        return 1
+    }
+    device = os.args_get(1)
+    credential = os.args_get(2)
+    page, perr = file.read("controller/index.html")
+    script, jerr = file.read("controller/assets/datastar.js")
+    if perr != "" || jerr != "" {
+        println("Run the controller from the ESP32 repository root")
+        return 1
+    }
+    server = tinyweb.web_server_host("127.0.0.1", 8787) {
+        tinyweb.end_point(tinyweb.GET, "/") |req: ptr, res: ptr, ctx: ptr| {
+            if !local_request(req, res) { return }
+            tinyweb.response_set_header(res, "Content-Type", "text/html; charset=utf-8")
+            tinyweb.response_write(res, page)
+        }
+        tinyweb.end_point(tinyweb.GET, "/assets/datastar.js") |req: ptr, res: ptr, ctx: ptr| {
+            if !local_request(req, res) { return }
+            tinyweb.response_set_header(res, "Content-Type", "text/javascript; charset=utf-8")
+            tinyweb.response_write(res, script)
+        }
+        tinyweb.end_point(tinyweb.GET, "/status") |req: ptr, res: ptr, ctx: ptr| {
+            if !local_request(req, res) { return }
+            raw = device_status(device, credential)
+            signals, err = json.parse(raw)
+            if err != "" { return }
+            defer json.json_free(signals)
+            sse, serr = datastar.new_sse(res)
+            if serr != "" { return }
+            defer datastar.sse_close(sse)
+            _sent = datastar.patch_signals(sse, raw, null)
+        }
+    }
+    println("Device controller at http://127.0.0.1:8787")
+    err = tinyweb.tw_start(server)
+    if err != "" { println(err); return 1 }
+    tinyweb.tw_stop(server)
+    return 0
+}
