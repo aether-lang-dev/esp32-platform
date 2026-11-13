@@ -3,6 +3,7 @@
 #include "runner_host.h"
 #ifdef RUNNER_PSK
 #include "runner_psk.h"
+#include "runner_repl.h"
 #endif
 #ifdef RUNNER_SIGNED
 #include "runner_bundle.h"
@@ -180,6 +181,7 @@ static bool network_start(void) {
         return false;
     }
 #endif
+    http.max_uri_handlers = 12;
     http.recv_wait_timeout = 2;
 #ifdef RUNNER_SIGNED
     http.stack_size = 8192;
@@ -191,6 +193,9 @@ static bool network_start(void) {
     const httpd_uri_t get = {.uri="/status", .method=HTTP_GET, .handler=status_get};
     ESP_ERROR_CHECK(httpd_register_uri_handler(server, &post));
     ESP_ERROR_CHECK(httpd_register_uri_handler(server, &get));
+#ifdef RUNNER_PSK
+    ESP_ERROR_CHECK(runner_repl_start(server));
+#endif
 #ifdef RUNNER_WIFI
     puts("SIGNED CYD Wi-Fi endpoint started");
     cyd_console_line("Wi-Fi signed runner ready");
@@ -243,7 +248,12 @@ void app_main(void) {
     if (!network_start()) return;
     for (;;) {
         Upload upload;
+#ifdef RUNNER_PSK
+        runner_repl_poll();
+        if (xQueueReceive(uploads, &upload, pdMS_TO_TICKS(50)) != pdTRUE) continue;
+#else
         if (xQueueReceive(uploads, &upload, portMAX_DELAY) != pdTRUE) continue;
+#endif
         portENTER_CRITICAL(&state_lock);
         phase = "running";
         portEXIT_CRITICAL(&state_lock);

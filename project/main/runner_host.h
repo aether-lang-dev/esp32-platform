@@ -25,6 +25,17 @@ typedef struct {
     unsigned logs;
     bool cancelled;
 } RunnerStats;
+#ifdef RUNNER_PSK
+typedef struct {
+    void *context, *account, *memory;
+    void (*output)(void *argument, const char *kind, const char *text);
+    bool (*cancelled)(void *argument);
+    void *argument;
+} RunnerSession;
+int runner_session_execute(RunnerSession *session, const char *source, unsigned grants, RunnerStats *stats);
+void runner_session_close(RunnerSession *session);
+#endif
+
 /* Called from the runner task only; source is copied by the engine. */
 int runner_execute(const char *source, unsigned grants, RunnerStats *stats);
 #ifdef RUNNER_USB

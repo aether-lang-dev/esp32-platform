@@ -10,6 +10,10 @@ if(AE_PROG STREQUAL "runner-cyd-usb")
 endif()
 if(AE_PROG MATCHES "^(psk-probe|runner-signed-psk|runner-cyd-wifi)$")
     list(APPEND SRCS "runner_psk.c")
+    if(NOT AE_PROG STREQUAL "psk-probe")
+        list(APPEND SRCS "runner_repl.c")
+        set_source_files_properties("runner_repl.c" PROPERTIES COMPILE_OPTIONS "-Wall;-Wextra;-Werror")
+    endif()
 endif()
 # IDF expands component requirements before AE_HOST is available in its
 # dependency scan. Keep the dependencies unconditional; unused code is removed

@@ -203,6 +203,12 @@ def run(request, status_when, lines, fixture_dir, flash_path, reset, context=Non
     accepted('maintenance-window')
     maintenance = request('/status')[1]
     assert maintenance['activeVersion'] == 17 and maintenance['highestVersion'] == 17, maintenance
+    if context:
+        from test_repl_delivery import run as check_repl
+        unchanged = storage_snapshot()
+        check_repl('https://127.0.0.1:18080', context)
+        assert storage_snapshot() == unchanged, 'REPL modified persistent storage'
+
     text = ''.join(lines)
     assert 'RUNNER log 2: Next maintenance window: 2026-11-09T02:30:00.000Z' in text
     assert 'maintenance schedule evaluated' not in text

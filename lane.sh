@@ -108,6 +108,10 @@ echo "target:  $TARGET"
 echo "results: ${ESP32_KEEP:-(not kept)}"
 
 want="${*:-hello rexxae}"
+qemu_timeout="${QEMU_TIMEOUT:-120}"
+case " $want " in
+    *" runner-signed-psk "*) qemu_timeout="${QEMU_TIMEOUT:-240}" ;;
+esac
 case " $want " in
     *" runner-http "*|*" runner-signed "*|*" runner-signed-psk "*|*" runner-cyd-wifi "*|*" runner-cyd-usb "*|*" psk-probe "*)
         [ "$TARGET" = esp32 ] || { echo "[FAIL] network runners require ESP32_TARGET=esp32"; exit 1; } ;;
@@ -168,7 +172,7 @@ cp "$HERE/in_container.sh" "$tmp/in_container.sh"
     -e RUNNER_TOIT_WAKE="${RUNNER_TOIT_WAKE:-}" \
     -e RUNNER_TOIT_IO="${RUNNER_TOIT_IO:-}" \
     -e RUNNER_LED_GPIO="${RUNNER_LED_GPIO:-}" \
-    -e QEMU_TIMEOUT="${QEMU_TIMEOUT:-120}" -e AE_TRACE_ALLOC="${AE_TRACE_ALLOC:-}" \
+    -e QEMU_TIMEOUT="$qemu_timeout" -e AE_TRACE_ALLOC="${AE_TRACE_ALLOC:-}" \
     -v "$tmp/aether:/aether:ro" -v "$tmp/rexxae:/rexxae:ro" \
     -v "$tmp/tools:/tools:ro" -v "$tmp/project:/project:ro" -v "$tmp/scripts:/scripts:ro" \
     -v "$tmp/in_container.sh:/in_container.sh:ro" \

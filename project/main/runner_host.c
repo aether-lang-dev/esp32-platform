@@ -94,6 +94,9 @@ static bool led_write(int level) {
 #endif
 
 static int execute(const char *source, unsigned grants, RunnerStats *stats
+#ifdef RUNNER_PSK
+                   , RunnerSession *session
+#endif
 #ifndef RUNNER_HTTP
                    , unsigned *led_trace, DemoPeripheral peripheral
 #elif defined(RUNNER_USB)
@@ -122,6 +125,9 @@ static int execute(const char *source, unsigned grants, RunnerStats *stats
         .deadline_counts = AETHER_DEADLINE_ELAPSED,
         .parent = previous,
     };
+#ifdef RUNNER_PSK
+    if (session) limits.parent = session->memory;
+#endif
     AetherExecAccount *account = aether_exec_account_new(&limits);
     if (!account || aether_exec_use(account, NULL) != 0) goto cleanup;
     const int64_t deadline = esp_timer_get_time() + DEADLINE_US;
@@ -129,8 +135,25 @@ static int execute(const char *source, unsigned grants, RunnerStats *stats
 #ifdef RUNNER_CYD_CONSOLE
     int64_t touch_deadline = 0;
 #endif
-    ENGINE_READ(ctx, aether_rexxae_create(source));
+#ifdef RUNNER_PSK
+    if (session && session->context) {
+        ENGINE_READ(ctx, aether_rexxae_create_next(session->context, source));
+    } else
+#endif
+    {
+        ENGINE_READ(ctx, aether_rexxae_create(source));
+    }
     if (!ctx) goto cleanup;
+#ifdef RUNNER_PSK
+    if (session) {
+        const char *parse_error;
+        ENGINE_READ(parse_error, aether_rexxae_error(ctx));
+        if (parse_error && *parse_error) {
+            session->output(session->argument, "error", parse_error);
+            goto cleanup;
+        }
+    }
+#endif
     ENGINE_ACCEPT(aether_rexxae_set_log_level(ctx, 2));
     if (grants & RUNNER_GRANT_UPTIME) ENGINE_ACCEPT(aether_rexxae_register_function(ctx, "UPTIME_MS", 0, 0));
     if (grants & RUNNER_GRANT_WAIT) ENGINE_ACCEPT(aether_rexxae_register_function(ctx, "WAIT_MS", 1, 1));
@@ -157,6 +180,13 @@ static int execute(const char *source, unsigned grants, RunnerStats *stats
 #endif
     for (;;) {
         vTaskDelay(1);
+#ifdef RUNNER_PSK
+        if (session && !stats->cancelled && session->cancelled(session->argument)) {
+            stats->cancelled = true;
+            ENGINE_ACCEPT(aether_rexxae_cancel(ctx, "cancelled from controller"));
+            wake = 0;
+        }
+#endif
         if (!stats->cancelled && (stats->steps >= STEP_LIMIT || esp_timer_get_time() >= deadline)) {
             stats->cancelled = true;
             ENGINE_ACCEPT(aether_rexxae_cancel(ctx, "runner budget exhausted"));
@@ -196,6 +226,9 @@ static int execute(const char *source, unsigned grants, RunnerStats *stats
         if (status == REXXAE_ERROR) {
             const char *text;
             ENGINE_READ(text, aether_rexxae_error(ctx));
+#ifdef RUNNER_PSK
+            if (session) session->output(session->argument, "error", text ? text : "Rexx error");
+#endif
 #ifdef RUNNER_USB
             usb_output("RUNNER error: ", text ? text : "no error text");
 #else
@@ -223,6 +256,9 @@ static int execute(const char *source, unsigned grants, RunnerStats *stats
             }
             ENGINE_READ(text, aether_rexxae_text(ctx));
             if (!text) goto cleanup;
+#ifdef RUNNER_PSK
+            if (session) session->output(session->argument, level < 0 ? "say" : "log", text);
+#endif
 #ifdef RUNNER_USB
             char prefix[32];
             if (level < 0) usb_output("RUNNER> ", text);
@@ -463,6 +499,16 @@ cleanup:
 #endif
     /* The trusted destructor must run outside the exhausted account. */
     aether_exec_use(NULL, NULL);
+#ifdef RUNNER_PSK
+    if (session && result == 0 && stats->runtime_outcome == AETHER_OK && !stats->cancelled) {
+        if (session->context) aether_rexxae_destroy(session->context);
+        if (session->account) aether_exec_account_free(session->account);
+        session->context = ctx;
+        session->account = account;
+        ctx = NULL;
+        account = NULL;
+    }
+#endif
     if (ctx) {
         aether_rexxae_destroy(ctx);
         if (!engine_ok(stats, "destroy")) result = -1;
@@ -502,11 +548,44 @@ int runner_execute(const char *source, unsigned grants, RunnerStats *stats) {
 #ifdef RUNNER_USB
     return runner_execute_touch(source, grants, stats, NULL, 0);
 #elif defined(RUNNER_HTTP)
+#ifdef RUNNER_PSK
+    return execute(source, grants, stats, NULL);
+#else
     return execute(source, grants, stats);
+#endif
 #else
     return execute(source, grants, stats, NULL, DEMO_NONE);
 #endif
 }
+#ifdef RUNNER_PSK
+void runner_session_close(RunnerSession *session) {
+    AetherExecAccount *previous = NULL;
+    aether_exec_use(NULL, &previous);
+    if (session->context) aether_rexxae_destroy(session->context);
+    if (session->account) aether_exec_account_free(session->account);
+    if (session->memory) aether_exec_account_free(session->memory);
+    session->context = session->account = session->memory = NULL;
+    aether_exec_use(previous, NULL);
+}
+
+int runner_session_execute(RunnerSession *session, const char *source, unsigned grants, RunnerStats *stats) {
+    if (!session->memory) {
+        AetherExecLimits limits = {.memory_bytes = 64u * 1024u};
+        session->memory = aether_exec_account_new(&limits);
+        if (!session->memory) {
+            memset(stats, 0, sizeof *stats);
+            return -1;
+        }
+    }
+    int result = execute(source, grants, stats, session);
+    if (stats->runtime_outcome != AETHER_OK || aether_exec_account_tripped(session->memory)) {
+        session->output(session->argument, "error", "Session variables reset after a resource limit");
+        runner_session_close(session);
+    }
+    return result;
+}
+#endif
+
 #undef ENGINE_READ
 #undef ENGINE_ACCEPT
 
