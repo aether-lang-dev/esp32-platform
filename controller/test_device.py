@@ -12,7 +12,7 @@ class DeviceStatusTests(unittest.TestCase):
                 "trialVersion": 0, "exitCode": 0, "credential": "unexpected-secret",
             }
             result = device.read_status("https://192.0.2.50", Path("/private/device.json"))
-        self.assertEqual(result, {"connected": True, "message": "", "state": "idle",
+        self.assertEqual(result, {"connected": True, "target": "192.0.2.50", "message": "", "state": "idle",
                                  "active": 4, "floor": 5, "trial": 0, "exit": 0})
         self.assertNotIn("unexpected-secret", str(result))
 

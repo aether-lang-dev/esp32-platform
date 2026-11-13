@@ -26,7 +26,20 @@ Control requests require the controller's Host and Origin headers. It is
 intended for the current single-operator functional testing. Remote access,
 controller TLS and a user ACL remain future work.
 Set `REXX_CONTROLLER_PYTHON` if the PSK-capable Python executable has a
-different name or path from `python3.13`.
+different name or path from `python3.13`. Set `REXX_CONTROLLER_PORT`
+to run another controller instance on a separate loopback port. Its Host
+and Origin checks follow the selected port.
+
+The opt-in integration check exercises a controller connected to a disposable
+QEMU device:
+
+```sh
+python3.13 controller/test_http.py http://127.0.0.1:8788
+```
+
+It checks streamed output before completion, retained variables, concurrent
+Cancel, continued use after cancellation, Host/Origin rejection and unchanged
+installed-app metadata. It creates and closes its own REPL session.
 
 The locally served Datastar client is v1.0.3 from
 https://cdn.jsdelivr.net/gh/starfederation/datastar@v1.0.3/bundles/datastar.js,

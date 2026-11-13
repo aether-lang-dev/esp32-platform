@@ -6,11 +6,22 @@ import std.list
 import std.os
 import std.string
 
-const ORIGIN = "127.0.0.1:8787"
+fn controller_port() -> int {
+    raw = os.getenv("REXX_CONTROLLER_PORT")
+    if raw == "" { return 8787 }
+    port, err = string.to_int(raw)
+    if err != "" || port < 1 || port > 65535 { return 0 }
+    return port
+}
+
+fn controller_origin() -> string {
+    port = controller_port()
+    return "127.0.0.1:${port}"
+}
 
 fn local_request(req: ptr, res: ptr) -> bool {
     host = tinyweb.request_get_header(req, "Host")
-    if host != ORIGIN {
+    if host != controller_origin() {
         tinyweb.response_write_status(res, "Unknown controller host", 403)
         return false
     }
@@ -82,7 +93,7 @@ fn repl_patch(sse: ptr, sid: string, sequence: int, busy: bool,
 
 fn repl_action(req: ptr, res: ptr, device: string, credential: string, action: string) {
     if !local_request(req, res) { return }
-    if tinyweb.request_get_header(req, "Origin") != "http://127.0.0.1:8787" {
+    if tinyweb.request_get_header(req, "Origin") != "http://${controller_origin()}" {
         tinyweb.response_write_status(res, "Controller origin required", 403)
         return
     }
@@ -122,7 +133,7 @@ fn repl_action(req: ptr, res: ptr, device: string, credential: string, action: s
         return
     }
     if action == "cancel" {
-        _cancelled = datastar.patch_signals(sse, "{\"message\":\"Cancellation requested\"}", null)
+        _cancelled = datastar.patch_signals(sse, "{}", null)
         return
     }
     transcript = string.concat(transcript, string.concat("rexx> ", string.concat(source, "\n")))
@@ -171,7 +182,9 @@ main() {
         println("Run the controller from the ESP32 repository root")
         return 1
     }
-    server = tinyweb.web_server_host("127.0.0.1", 8787) {
+    port = controller_port()
+    if port == 0 { println("Invalid REXX_CONTROLLER_PORT"); return 1 }
+    server = tinyweb.web_server_host("127.0.0.1", port) {
         tinyweb.end_point(tinyweb.GET, "/") |req: ptr, res: ptr, ctx: ptr| {
             if !local_request(req, res) { return }
             tinyweb.response_set_header(res, "Content-Type", "text/html; charset=utf-8")
@@ -206,7 +219,7 @@ main() {
             _sent = datastar.patch_signals(sse, raw, null)
         }
     }
-    println("Device controller at http://127.0.0.1:8787")
+    println("Device controller at http://${controller_origin()}")
     err = tinyweb.tw_start(server)
     if err != "" { println(err); return 1 }
     tinyweb.tw_stop(server)

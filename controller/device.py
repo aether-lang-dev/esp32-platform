@@ -20,6 +20,7 @@ def read_status(device, credential):
     state = Runner(device, credential).status()
     return {
         "connected": True,
+        "target": urlsplit(device).netloc,
         "message": "",
         "state": state["state"],
         "active": state["activeVersion"],
