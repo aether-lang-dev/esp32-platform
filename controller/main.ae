@@ -4,6 +4,7 @@ import std.file
 import std.json
 import std.list
 import std.os
+import std.string
 
 const ORIGIN = "127.0.0.1:8787"
 
@@ -20,7 +21,8 @@ fn local_request(req: ptr, res: ptr) -> bool {
     return true
 }
 
-fn device_status(device: string, credential: string) -> string {
+fn device_call(device: string, credential: string, action: string,
+               session: string, sequence: int, source: string) -> string {
     args = list.new()
     defer list.free(args)
     list.add(args, "controller/device.py")
@@ -28,14 +30,132 @@ fn device_status(device: string, credential: string) -> string {
     list.add(args, device)
     list.add(args, "--credential")
     list.add(args, credential)
-    list.add(args, "status")
+    list.add(args, action)
+    list.add(args, "--session=${session}")
+    list.add(args, "--sequence=${sequence}")
+    list.add(args, "--source=${source}")
     python = os.getenv("REXX_CONTROLLER_PYTHON")
     if python == "" { python = "python3.13" }
     output, _code, err = os.run_capture(python, args, null)
     if err != "" || output == "" {
-        return "{\"connected\":false,\"message\":\"Local transport failed\"}"
+        return "{\"connected\":false,\"ok\":false,\"message\":\"Local transport failed\"}"
     }
     return output
+}
+
+fn text_field(value: ptr, name: string) -> string {
+    field, _err = json.object_get(value, name)
+    if field == null { return "" }
+    text, err = json.get_string(field)
+    if err != "" { return "" }
+    return text
+}
+
+fn int_field(value: ptr, name: string) -> int {
+    field, _err = json.object_get(value, name)
+    return json.json_get_int(field)
+}
+
+fn bool_field(value: ptr, name: string) -> bool {
+    field, _err = json.object_get(value, name)
+    return json.json_get_bool(field) != 0
+}
+
+fn repl_patch(sse: ptr, sid: string, sequence: int, busy: bool,
+              notice: string, transcript: string) -> string {
+    signals = json.obj()
+    defer json.json_free(signals)
+    _a = json.set(signals, "sid", json.str(sid))
+    _b = json.set(signals, "seq", json.from_int(sequence))
+    flag = 0
+    if busy { flag = 1 }
+    _c = json.set(signals, "busy", json.boolean(flag))
+    _d = json.set(signals, "message", json.str(notice))
+    visible = transcript
+    if string.length(visible) > 32000 {
+        visible = string.concat("[earlier output trimmed]\n", string.substring(visible, string.length(visible) - 30000, string.length(visible)))
+    }
+    _e = json.set(signals, "transcript", json.str(visible))
+    raw, _err = json.encode(signals)
+    return datastar.patch_signals(sse, raw, null)
+}
+
+fn repl_action(req: ptr, res: ptr, device: string, credential: string, action: string) {
+    if !local_request(req, res) { return }
+    if tinyweb.request_get_header(req, "Origin") != "http://127.0.0.1:8787" {
+        tinyweb.response_write_status(res, "Controller origin required", 403)
+        return
+    }
+    signals, err = datastar.read_signals(req)
+    if err != "" || signals == null {
+        tinyweb.response_write_status(res, "Invalid signals", 400)
+        return
+    }
+    defer json.json_free(signals)
+    sid = text_field(signals, "sid")
+    sequence = int_field(signals, "seq")
+    source = text_field(signals, "code")
+    transcript = text_field(signals, "transcript")
+    next = sequence
+    if action == "run" { next = sequence + 1 }
+    raw = device_call(device, credential, action, sid, next, source)
+    result, parse_error = json.parse(raw)
+    if parse_error != "" { tinyweb.response_write_status(res, "Invalid transport result", 502); return }
+    defer json.json_free(result)
+    sse, stream_error = datastar.new_sse(res)
+    if stream_error != "" { return }
+    defer datastar.sse_close(sse)
+    if !bool_field(result, "ok") {
+        notice = text_field(result, "error")
+        if notice == "" { notice = text_field(result, "message") }
+        if notice == "session expired or replaced" { sid = ""; sequence = 0 }
+        _failed = repl_patch(sse, sid, sequence, false, notice, transcript)
+        return
+    }
+    if action == "open" {
+        sid = text_field(result, "session")
+        _opened = repl_patch(sse, sid, 0, false, "REPL connected. Timers available.", transcript)
+        return
+    }
+    if action == "close" {
+        _closed = repl_patch(sse, "", 0, false, "Session closed", transcript)
+        return
+    }
+    if action == "cancel" {
+        _cancelled = datastar.patch_signals(sse, "{\"message\":\"Cancellation requested\"}", null)
+        return
+    }
+    transcript = string.concat(transcript, string.concat("rexx> ", string.concat(source, "\n")))
+    sent = repl_patch(sse, sid, next, true, "Running", transcript)
+    cursor = 0
+    for (poll = 0; poll < 40; poll++) {
+        if sent != "" {
+            _cancel = device_call(device, credential, "cancel", sid, 0, "")
+            return
+        }
+        event_raw = device_call(device, credential, "events", sid, cursor, "")
+        state, state_error = json.parse(event_raw)
+        if state_error != "" { break }
+        if !bool_field(state, "ok") {
+            json.json_free(state)
+            break
+        }
+        cursor = int_field(state, "cursor")
+        if bool_field(state, "lost") { transcript = string.concat(transcript, "[device output buffer overrun]\n") }
+        if int_field(state, "sequence") == next {
+            transcript = string.concat(transcript, text_field(state, "output"))
+            if text_field(state, "state") == "done" {
+                rc = int_field(state, "exitCode")
+                json.json_free(state)
+                _done = repl_patch(sse, sid, next, false, "Exit ${rc}", transcript)
+                return
+            }
+        }
+        json.json_free(state)
+        sent = repl_patch(sse, sid, next, true, "Running", transcript)
+        sleep(150)
+    }
+    _unknown = repl_patch(sse, sid, next, false, "Outcome unknown. Close this session before retrying.", transcript)
 }
 
 main() {
@@ -62,9 +182,21 @@ main() {
             tinyweb.response_set_header(res, "Content-Type", "text/javascript; charset=utf-8")
             tinyweb.response_write(res, script)
         }
+        tinyweb.end_point(tinyweb.POST, "/repl/open") |req: ptr, res: ptr, ctx: ptr| {
+            repl_action(req, res, device, credential, "open")
+        }
+        tinyweb.end_point(tinyweb.POST, "/repl/run") |req: ptr, res: ptr, ctx: ptr| {
+            repl_action(req, res, device, credential, "run")
+        }
+        tinyweb.end_point(tinyweb.POST, "/repl/cancel") |req: ptr, res: ptr, ctx: ptr| {
+            repl_action(req, res, device, credential, "cancel")
+        }
+        tinyweb.end_point(tinyweb.POST, "/repl/close") |req: ptr, res: ptr, ctx: ptr| {
+            repl_action(req, res, device, credential, "close")
+        }
         tinyweb.end_point(tinyweb.GET, "/status") |req: ptr, res: ptr, ctx: ptr| {
             if !local_request(req, res) { return }
-            raw = device_status(device, credential)
+            raw = device_call(device, credential, "status", "", 0, "")
             signals, err = json.parse(raw)
             if err != "" { return }
             defer json.json_free(signals)

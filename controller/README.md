@@ -12,7 +12,19 @@ that Host header. Status requests go through the existing PSK transport.
 The browser receives device status. Keep device credential files outside
 the repository.
 
-The first slice displays status. The device REPL protocol is the next slice.
+The page includes device status and a multiline Rexx REPL. Open a session,
+run commands, and use Cancel for an active command. Variables survive
+successful commands. Close and reopen to reset them. The device currently
+mounts UPTIME_MS and WAIT_MS for the interactive session.
+
+The REPL firmware must be installed first. Its protocol and bounds are in
+../project/REPL.md. The controller reads the PSK from the configured local
+file. The browser receives the session identifier and output.
+
+This development controller uses HTTP on loopback and has no user login.
+Control requests require the controller's Host and Origin headers. It is
+intended for the current single-operator functional testing. Remote access,
+controller TLS and a user ACL remain future work.
 Set `REXX_CONTROLLER_PYTHON` if the PSK-capable Python executable has a
 different name or path from `python3.13`.
 
