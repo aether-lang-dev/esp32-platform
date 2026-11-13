@@ -64,6 +64,7 @@ def run(endpoint, context):
             state = request("/repl/events", session=session, after=0)[1]
             if state["sequence"] == 6 and state["state"] == "running" and "stream-before" in text(state):
                 break
+            time.sleep(0.15)
         else:
             raise AssertionError("output was not visible before completion")
         assert request("/repl/cancel", b"", session=session)[0] == 202

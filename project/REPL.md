@@ -37,3 +37,9 @@ the signed QEMU lane. It checks variable retention, errors, grant denial,
 streamed output, cancellation, repeated contexts, Unicode chunk boundaries,
 output overrun, memory-limit recovery, fresh sessions and unchanged app
 state/storage.
+
+Verified on the physical Sonoff S60TPG on 2026-11-13, including the local
+Datastar controller, cancellation, variable retention, Unicode output and
+memory-limit recovery. Installed release v4 and its replay floor survived
+the firmware update and remained unchanged through the REPL checks. The
+diagnostic pauses between polls, matching the controller's Wi-Fi cadence.

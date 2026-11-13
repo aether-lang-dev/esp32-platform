@@ -39,7 +39,8 @@ python3.13 controller/test_http.py http://127.0.0.1:8788
 
 It checks streamed output before completion, retained variables, concurrent
 Cancel, continued use after cancellation, Host/Origin rejection and unchanged
-installed-app metadata. It creates and closes its own REPL session.
+installed-app metadata. It creates and closes its own REPL session. The same check passed against
+the S60 controller on 2026-11-13 after installing the REPL firmware.
 
 The locally served Datastar client is v1.0.3 from
 https://cdn.jsdelivr.net/gh/starfederation/datastar@v1.0.3/bundles/datastar.js,
