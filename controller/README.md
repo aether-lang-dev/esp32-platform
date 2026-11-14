@@ -15,8 +15,11 @@ the repository.
 The page includes device status and a multiline Rexx REPL. Open a session,
 run commands, and use Cancel for an active command. Variables survive
 successful commands. Close and reopen to reset them. The device currently
-mounts UPTIME_MS, WAIT_MS and ADDRESS APPS for the interactive session.
-The master session requests separate inventory, run and service-call grants.
+mounts UPTIME_MS, WAIT_MS, ADDRESS APPS and ADDRESS SWITCH for the interactive session.
+The master session requests separate inventory, run, service-call and switch read/control grants.
+On S60, `ADDRESS SWITCH 'ON 5'` requests five seconds of relay power after
+the submitted program succeeds; OFF and STATUS are also available. Closing
+the session or cancelling turns its output off.
 For a signed app opting into the main v1 service contract, try:
 
 ```rexx

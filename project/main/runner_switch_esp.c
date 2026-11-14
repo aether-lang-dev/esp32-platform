@@ -1,7 +1,7 @@
 /* The independent ESP timer owns switch expiration. */
 #include "runner_switch.h"
 #include "esp_timer.h"
-#ifdef RUNNER_CYD_SWITCH_LED
+#if defined(RUNNER_CYD_SWITCH_LED) || defined(RUNNER_S60)
 #include "driver/gpio.h"
 #endif
 #include "freertos/FreeRTOS.h"
@@ -11,8 +11,23 @@ static portMUX_TYPE lock = portMUX_INITIALIZER_UNLOCKED;
 static RunnerSwitch state;
 static bool expired;
 static bool ready;
+static RunnerSwitchLease lease;
 
-#ifdef RUNNER_CYD_SWITCH_LED
+#ifdef RUNNER_S60
+static bool drive(bool on) {
+    int level = on ? 1 : 0;
+    return gpio_set_level(GPIO_NUM_4, level) == ESP_OK && gpio_get_level(GPIO_NUM_4) == level;
+}
+static bool configure_output(void) {
+    const gpio_config_t config = {
+        .pin_bit_mask = 1ULL << GPIO_NUM_4, .mode = GPIO_MODE_INPUT_OUTPUT,
+        .pull_up_en = GPIO_PULLUP_DISABLE, .pull_down_en = GPIO_PULLDOWN_DISABLE,
+        .intr_type = GPIO_INTR_DISABLE,
+    };
+    return gpio_hold_dis(GPIO_NUM_4) == ESP_OK && gpio_set_level(GPIO_NUM_4, 0) == ESP_OK &&
+        gpio_config(&config) == ESP_OK;
+}
+#elif defined(RUNNER_CYD_SWITCH_LED)
 enum { BENCH_LED = GPIO_NUM_22 };
 static bool drive(bool on) {
     int level = on ? 0 : 1;
@@ -42,6 +57,7 @@ static void expire(void *unused) {
     if (runner_switch_expire(&state, esp_timer_get_time())) {
         if (!runner_output_write(&output, &state, false)) ready = false;
         expired = true;
+        lease.owner = NULL;
     }
     portEXIT_CRITICAL(&lock);
 }
@@ -90,9 +106,8 @@ bool runner_switch_take_timeout(void) {
     return value;
 }
 
-bool runner_switch_finish(int seconds, bool success) {
+static bool finish_locked(int seconds, bool success) {
     if (success && seconds == RUNNER_SWITCH_KEEP) return true;
-    portENTER_CRITICAL(&lock);
     int duration = success && ready ? seconds : 0;
     bool applied = runner_output_write(&output, &state, duration > 0);
     if (!applied) {
@@ -102,8 +117,40 @@ bool runner_switch_finish(int seconds, bool success) {
     }
     runner_switch_apply(&state, duration, esp_timer_get_time());
     expired = false;
+    return applied && (seconds <= 0 || !success || duration > 0);
+}
+
+bool runner_switch_finish(int seconds, bool success) {
+    portENTER_CRITICAL(&lock);
+    bool applied = finish_locked(seconds, success);
     portEXIT_CRITICAL(&lock);
     if (!applied) puts("SIGNED USB SWITCH output fault");
-    else printf("SIGNED USB SWITCH %s\n", duration > 0 ? "ON" : "OFF");
-    return applied && (seconds <= 0 || !success || duration > 0);
+    else if (!(success && seconds == RUNNER_SWITCH_KEEP))
+        printf("SIGNED USB SWITCH %s\n", success && seconds > 0 ? "ON" : "OFF");
+    return applied;
+}
+
+bool runner_switch_acquire(const void *owner) {
+    portENTER_CRITICAL(&lock);
+    bool claimed = ready && runner_lease_claim(&lease, owner);
+    portEXIT_CRITICAL(&lock);
+    return claimed;
+}
+
+bool runner_switch_session_finish(const void *owner, int seconds, bool success) {
+    portENTER_CRITICAL(&lock);
+    bool owns = owner && lease.owner == owner;
+    bool applied = seconds == RUNNER_SWITCH_KEEP;
+    if (owns) {
+        /* Expiry must not clear ownership between the check and the write. */
+        applied = finish_locked(seconds, success);
+        if (!success || seconds == 0 || !applied)
+            (void)runner_lease_release(&lease, owner);
+    }
+    portEXIT_CRITICAL(&lock);
+    return applied;
+}
+
+void runner_switch_session_close(const void *owner) {
+    (void)runner_switch_session_finish(owner, 0, false);
 }

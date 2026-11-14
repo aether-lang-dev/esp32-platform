@@ -1,5 +1,6 @@
 /* Volatile PSK-authorized sessions, executed by the existing runner task. */
 #include "runner_repl.h"
+#include "runner_switch.h"
 #include "runner_host.h"
 #include "esp_random.h"
 #include "esp_timer.h"
@@ -236,7 +237,10 @@ void runner_repl_poll(void) {
     pending = NULL;
     if (source) phase = "running";
     xSemaphoreGive(lock);
-    if (!source) return;
+    if (!source) {
+        if (atomic_load(&cancelled)) runner_switch_session_close(&engine);
+        return;
+    }
     RunnerStats stats;
     int result = runner_session_execute(&engine, source, grants, &stats);
     free(source);

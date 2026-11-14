@@ -45,7 +45,7 @@ class DeviceStatusTests(unittest.TestCase):
             response.status = 200
             response.read.return_value = b'{"session":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}'
             device.repl_request("https://192.0.2.50", Path("/private/device.json"), "open")
-            connection.return_value.request.assert_called_once_with("POST", "/repl/open", b"7171", {})
+            connection.return_value.request.assert_called_once_with("POST", "/repl/open", b"7363", {})
 
     def test_repl_event_text_is_decoded_for_the_browser(self):
         with patch.object(device, "client_context"), patch.object(device, "load") as load, \

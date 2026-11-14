@@ -4,6 +4,7 @@
 #include "runner_host.h"
 #ifdef RUNNER_PSK
 #include "runner_apps.h"
+#include "runner_switch.h"
 #endif
 #if defined(RUNNER_CYD_CONSOLE) || defined(RUNNER_WIFI) || defined(RUNNER_USB)
 #include "cyd_console.h"
@@ -114,6 +115,7 @@ static int execute(const char *source, unsigned grants, RunnerStats *stats
 #else
     unsigned allowed = RUNNER_SIGNED_GRANTS;
 #ifdef RUNNER_PSK
+    int pending_switch = RUNNER_SWITCH_KEEP;
     if (session) allowed = RUNNER_REPL_GRANTS;
 #endif
     if (grants & ~allowed) return -1;
@@ -288,6 +290,26 @@ static int execute(const char *source, unsigned grants, RunnerStats *stats
             if (session && session->apps) {
                 const char *target;
                 ENGINE_READ(target, aether_rexxae_address(ctx));
+                if (target && !strcasecmp(target, "SWITCH")) {
+                    const char *command, *response = "";
+                    ENGINE_READ(command, aether_rexxae_text(ctx));
+                    if (!command) goto cleanup;
+                    bool reading = !strcasecmp(command, "STATUS");
+                    unsigned needed = reading ? RUNNER_GRANT_SWITCH_READ : RUNNER_GRANT_SWITCH_CONTROL;
+                    int rc = RUNNER_SWITCH_DENIED;
+                    if (grants & needed) {
+                        int proposed = pending_switch;
+                        rc = runner_switch_request(command, true, runner_switch_on(), &proposed, &response);
+                        if (rc == 0 && !reading && !runner_switch_acquire(session)) {
+                            rc = 8;
+                            response = "";
+                        }
+                        if (rc == 0) pending_switch = proposed;
+                    }
+                    ENGINE_ACCEPT(aether_rexxae_reply(ctx, rc, response,
+                        rc == 0 ? "" : "SWITCH command rejected"));
+                    continue;
+                }
                 if (target && !strcasecmp(target, "APPS")) {
                     const char *command;
                     ENGINE_READ(command, aether_rexxae_text(ctx));
@@ -543,6 +565,10 @@ cleanup:
     }
     if (aether_exec_use(previous, NULL) != 0) result = -1;
     if (stats->runtime_outcome != AETHER_OK || stats->retained_bytes) result = -1;
+#ifdef RUNNER_PSK
+    if (session && !runner_switch_session_finish(session, pending_switch,
+            result == 0 && !stats->cancelled)) result = -1;
+#endif
 #ifdef RUNNER_USB
     if (result == 0 && screen_pending && !cyd_console_layout(&screen, version)) {
         puts("SIGNED USB display unavailable");
@@ -582,6 +608,7 @@ int runner_execute(const char *source, unsigned grants, RunnerStats *stats) {
 }
 #ifdef RUNNER_PSK
 void runner_session_close(RunnerSession *session) {
+    runner_switch_session_close(session);
     AetherExecAccount *previous = NULL;
     aether_exec_use(NULL, &previous);
     if (session->context) aether_rexxae_destroy(session->context);
@@ -596,6 +623,7 @@ int runner_session_execute(RunnerSession *session, const char *source, unsigned 
         AetherExecLimits limits = {.memory_bytes = 64u * 1024u};
         session->memory = aether_exec_account_new(&limits);
         if (!session->memory) {
+            runner_switch_session_close(session);
             memset(stats, 0, sizeof *stats);
             return -1;
         }

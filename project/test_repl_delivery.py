@@ -193,3 +193,9 @@ def run(endpoint, context):
     finally:
         close_session(identifier)
     print("ADDRESS APPS signed service replies, error recovery and lifecycle isolation PASS", flush=True)
+
+    # Physical runs must explicitly opt in after confirming an empty outlet.
+    import os
+    if os.environ.get("REXX_TEST_SWITCH") == "1":
+        from test_switch_delivery import run as check_switch
+        check_switch(endpoint, context)

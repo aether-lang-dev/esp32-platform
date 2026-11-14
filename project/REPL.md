@@ -6,8 +6,8 @@ has a random identifier, fixed host-service grants and increasing command sequen
 numbers. The existing runner task executes both installed apps and REPL
 commands, keeping RexxAE contexts on their owning task.
 
-POST /repl/open takes an ASCII grant mask, using timer bits 1 and 2, APPS inspection bit 1024 and APPS run bit 2048 and APPS call bit 4096.
-The local master controller requests all five bits (7171).
+POST /repl/open takes an ASCII grant mask, using timer bits 1 and 2, APPS inspection bit 1024 and APPS run bit 2048 and APPS call bit 4096, SWITCH read bit 64 and SWITCH control bit 128.
+The local master controller requests all service bits (7363).
 The response contains a session identifier. Subsequent operations supply
 X-Repl-Session.
 
@@ -80,3 +80,37 @@ invalid requests return 4; execution or storage failure returns 20.
 
 The service receives no hardware authority. Future services needing peripherals
 must have their own explicit host contracts and grants.
+
+### Session-owned S60 relay
+
+On S60 firmware, ADDRESS SWITCH controls active-high GPIO4 through the host.
+The signed app and its stateless peer contexts have no switch grants. In a
+master REPL session:
+
+```rexx
+ADDRESS SWITCH 'ON 5'
+SAY RC
+SAY RESULT
+```
+
+ON requires a duration of 1 through 60 seconds. OFF turns it off, and STATUS
+reports ON or OFF. Read grant64 and control grant128 are independent; a
+control-only session cannot read STATUS. RC13 means denied, RC4 invalid,
+and RC8 means another owner holds the output or it is unavailable.
+
+The command stages its requested state and applies it only when the submitted
+Rexx program completes successfully. A STATUS in the same submission sees its
+staged state; STATUS in a later submission sees the host's current state.
+The independent ESP timer enforces expiry every 50ms. It does not depend on a
+Rexx WAIT or a browser staying connected. Expiry releases ownership. An owner
+command failing, cancellation (including idle cancellation), session close or
+session expiry turns the output off and releases ownership. A new boot starts
+off. Closing another owner cannot change the output. Signed app updates and
+ordinary peer calls do not gain the session's hardware authority.
+
+The signed QEMU profile uses the same driver lifecycle with simulated output.
+To include relay integration tests, run REXX_TEST_SWITCH=1 ./lane.sh
+runner-signed-psk with the usual target and engine settings. For physical runs,
+the outlet must be empty before setting REXX_TEST_SWITCH=1. Tests include
+separate grants, invalid timeouts, independent expiry, failed staged commands,
+owner failure, active/idle cancellation, close, and unchanged app metadata.

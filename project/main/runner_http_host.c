@@ -6,6 +6,7 @@
 #include "runner_repl.h"
 #include "runner_apps.h"
 #include "runner_peer.h"
+#include "runner_switch.h"
 #endif
 #ifdef RUNNER_SIGNED
 #include "runner_bundle.h"
@@ -310,6 +311,12 @@ void app_main(void) {
     }
     (void)cyd_console_init();
     cyd_console_line("RexxAE signed Wi-Fi");
+#endif
+#ifdef RUNNER_PSK
+    if (!runner_switch_init()) {
+        puts("SWITCH initialization failed (off)");
+        return;
+    }
 #endif
     uploads = xQueueCreate(1, sizeof(Upload));
     available = xSemaphoreCreateBinary();
