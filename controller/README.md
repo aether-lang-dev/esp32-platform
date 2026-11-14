@@ -64,3 +64,10 @@ The locally served Datastar client is v1.0.3 from
 https://cdn.jsdelivr.net/gh/starfederation/datastar@v1.0.3/bundles/datastar.js,
 SHA-256 `5d6b7794a50a83d82da962aec5e382f5ae83ac7afbc751f903f7a9c6bd433c65`.
 Its original MIT notice is in assets/DATASTAR-LICENSE.
+
+The native timed-outlet app is a separate ADDRESS environment:
+`ADDRESS OUTLET 'START 10'`, `STATUS` and `CANCEL`. It owns its
+countdown independently of the REPL session. Closing the REPL does not cancel
+OUTLET; use CANCEL or let its bounded timer expire. SWITCH continues to use
+session-owned leases. Signed peers may be granted OUTLET read and cancel,
+while start remains a master/physical-button capability. See project/REPL.md.

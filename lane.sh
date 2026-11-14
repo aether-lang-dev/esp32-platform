@@ -165,6 +165,7 @@ tar -C "$REXXAE_DIR" -cf - include | tar -C "$tmp/rexxae" -xf -
 cp -R "$HERE/project" "$HERE/scripts" "$HERE/tools" "$tmp/"
 cp "$HERE/in_container.sh" "$tmp/in_container.sh"
 "$ENGINE" run --rm \
+    -e REXX_TEST_OUTLET="${REXX_TEST_OUTLET:-}" \
     -e REXX_TEST_SWITCH="${REXX_TEST_SWITCH:-}" \
     -e ESP32_TARGET="$TARGET" -e QEMU_PSRAM="${QEMU_PSRAM:-8M}" \
     -e RUNNER_CYD_SWITCH_LED="${RUNNER_CYD_SWITCH_LED:-}" \

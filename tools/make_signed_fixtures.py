@@ -86,7 +86,7 @@ fixture('syntax-error', 'IF\n', 13, ['UPTIME_MS'])
 fixture('maintenance-window',
         Path('/scripts/examples/maintenance_window.rexx').read_text(), 17)
 
-fixture('after-power-cuts', Path('/scripts/examples/s60_service.rexx').read_text(), 21)
+fixture('after-power-cuts', Path('/scripts/examples/s60_service.rexx').read_text(), 21, ['OUTLET_READ', 'OUTLET_CANCEL'])
 
 (root / 'labels-peer.bundle').write_bytes(pack(
     b'EXIT 0\n', name='peer.labels.v1', version=1, key_id='fleet-current',

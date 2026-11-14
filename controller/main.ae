@@ -130,7 +130,7 @@ fn repl_action(req: ptr, res: ptr, device: string, credential: string, action: s
     }
     if action == "open" {
         sid = text_field(result, "session")
-        _opened = repl_patch(sse, sid, 0, false, "REPL connected. Timers, ADDRESS APPS and SWITCH available.", transcript)
+        _opened = repl_patch(sse, sid, 0, false, "REPL connected. Timers, ADDRESS APPS, SWITCH and OUTLET available.", transcript)
         return
     }
     if action == "close" {

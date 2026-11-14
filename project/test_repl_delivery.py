@@ -199,3 +199,6 @@ def run(endpoint, context):
     if os.environ.get("REXX_TEST_SWITCH") == "1":
         from test_switch_delivery import run as check_switch
         check_switch(endpoint, context)
+        if os.environ.get("REXX_TEST_OUTLET") == "1":
+            from test_outlet_delivery import run as check_outlet
+            check_outlet(endpoint, context)

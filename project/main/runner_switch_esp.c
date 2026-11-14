@@ -154,3 +154,28 @@ bool runner_switch_session_finish(const void *owner, int seconds, bool success) 
 void runner_switch_session_close(const void *owner) {
     (void)runner_switch_session_finish(owner, 0, false);
 }
+
+int runner_switch_owner_set(const void *owner, int seconds, bool toggle) {
+    if (!owner || seconds < 0 || seconds > 60) return 4;
+    portENTER_CRITICAL(&lock);
+    int rc = 0;
+    if (!ready) rc = 20;
+    else if (lease.owner && lease.owner != owner) rc = 8;
+    else {
+        if (toggle && lease.owner == owner && state.until_us) seconds = 0;
+        if (seconds > 0) (void)runner_lease_claim(&lease, owner);
+        if (!finish_locked(seconds, true)) rc = 20;
+        if (seconds == 0 || rc) (void)runner_lease_release(&lease, owner);
+    }
+    portEXIT_CRITICAL(&lock);
+    return rc;
+}
+
+int runner_switch_owner_remaining(const void *owner, bool *busy) {
+    portENTER_CRITICAL(&lock);
+    *busy = lease.owner && lease.owner != owner;
+    int64_t left = lease.owner == owner ? state.until_us - esp_timer_get_time() : 0;
+    int remaining = left > 0 ? (int)((left + 999999) / 1000000) : 0;
+    portEXIT_CRITICAL(&lock);
+    return remaining;
+}

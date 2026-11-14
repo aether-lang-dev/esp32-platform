@@ -7,6 +7,7 @@
 #include "runner_apps.h"
 #include "runner_peer.h"
 #include "runner_switch.h"
+#include "runner_outlet.h"
 #endif
 #ifdef RUNNER_SIGNED
 #include "runner_bundle.h"
@@ -74,6 +75,13 @@ static int apps_start(unsigned *request) {
     return 0;
 }
 
+static int peer_service(const char *target, const char *command, unsigned grants, char *result) {
+    result[0] = 0;
+    if (strcasecmp(target, "OUTLET")) return 13;
+    return runner_outlet_command(command,
+        grants & (RUNNER_GRANT_OUTLET_READ | RUNNER_GRANT_OUTLET_CANCEL), result);
+}
+
 /* Called on the REPL's owning task, under its execution account. */
 static int apps_call(const char *command, char *result) {
     result[0] = 0;
@@ -90,7 +98,8 @@ static int apps_call(const char *command, char *result) {
             ((unsigned char *)active.source)[active.source_length] = 0;
             char reply[RUNNER_PEER_TEXT_LIMIT + 1];
             int outcome;
-            rc = runner_peer_call((const char *)active.source, command, reply, &outcome);
+            rc = runner_peer_call_service((const char *)active.source, command, active.grants,
+                                          peer_service, reply, &outcome);
             if (rc == 0 && !*reply) rc = RUNNER_APPS_FAULT;
             if (rc == 0) strcpy(result, reply);
         } else rc = RUNNER_APPS_INVALID;

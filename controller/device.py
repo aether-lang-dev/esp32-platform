@@ -43,7 +43,7 @@ def repl_request(device, credential, action, session="", sequence=0, source=""):
         headers["X-Repl-Session"] = session
     body = None
     if action == "open":
-        body = b"7363"  # timers, APPS and SWITCH read/control
+        body = b"64707"  # timers, APPS, SWITCH and native OUTLET
     elif action == "run":
         body = source.encode("utf-8")
         if not 1 <= len(body) <= 8192:

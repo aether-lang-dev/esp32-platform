@@ -114,3 +114,47 @@ runner-signed-psk with the usual target and engine settings. For physical runs,
 the outlet must be empty before setting REXX_TEST_SWITCH=1. Tests include
 separate grants, invalid timeouts, independent expiry, failed staged commands,
 owner failure, active/idle cancellation, close, and unchanged app metadata.
+
+### Native timed-outlet application
+
+`ADDRESS OUTLET 'START 10'` starts a host-owned countdown for 1–60 seconds.
+`STATUS` returns JSON with app, state (running/idle), remaining seconds rounded
+up, and busy (a different owner holds the relay). `CANCEL` stops this app's
+countdown. The countdown and relay lease belong to the native application:
+closing or failing the calling Rexx session does not stop it. Expiry or an
+explicit cancellation stops it. These native app commands act immediately;
+they are RPC effects, unlike the session-staged SWITCH interface.
+
+OUTLET read8192, start16384 and cancel32768 are separate grants. The local
+master requests all of them (total grant mask64707). RC13 is denied, RC4
+invalid, RC8 competing owner and RC20 unavailable/fault. OUTLET cannot steal
+a SWITCH session's lease, and SWITCH cannot steal OUTLET's active lease.
+Cancelling OUTLET cannot turn off another owner's output.
+
+On the S60, a button press sampled for at least200ms but less than5seconds
+toggles this application: start its default10seconds, or cancel its active
+countdown. A competing owner makes this toggle do nothing. A long hold still
+returns to retained Safeboot after release and never starts a countdown.
+Boot starts off; there is no persistent automatic start setting.
+
+Signed apps can receive OUTLET_READ and OUTLET_CANCEL in their manifest.
+They cannot receive OUTLET_CONTROL/start on this profile. An APPS peer call
+gets only its own signed grants, masked by the host to outlet read/cancel;
+it never inherits the calling REPL's grants. The example service exposes:
+
+```rexx
+ADDRESS APPS 'CALL main outlet STATUS'
+SAY RESULT
+ADDRESS APPS 'CALL main outlet CANCEL'
+SAY RC
+```
+
+The source context is still stateless; all callers address the same native
+application state. The native application owns GPIO and timer through the
+base driver. RexxAE itself remains headless and platform-independent.
+
+Unit tests cover button bounce/short/long release, native ownership, expiry
+and separate grants. Set both REXX_TEST_OUTLET=1 and REXX_TEST_SWITCH=1 for
+QEMU integration. Physical tests require an empty outlet. They exercise
+caller close/failure without stopping the native app, relay contention,
+countdown expiry, and signed peer status/cancel with denied start.

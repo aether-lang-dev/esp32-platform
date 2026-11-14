@@ -4,6 +4,7 @@
 #include "runner_host.h"
 #ifdef RUNNER_PSK
 #include "runner_apps.h"
+#include "runner_outlet.h"
 #include "runner_switch.h"
 #endif
 #if defined(RUNNER_CYD_CONSOLE) || defined(RUNNER_WIFI) || defined(RUNNER_USB)
@@ -287,6 +288,17 @@ static int execute(const char *source, unsigned grants, RunnerStats *stats
 #endif
         } else if (status == REXXAE_COMMAND) {
 #ifdef RUNNER_PSK
+            const char *service;
+            ENGINE_READ(service, aether_rexxae_address(ctx));
+            if (service && !strcasecmp(service, "OUTLET")) {
+                const char *command;
+                ENGINE_READ(command, aether_rexxae_text(ctx));
+                if (!command) goto cleanup;
+                char reply[RUNNER_OUTLET_TEXT + 1];
+                int rc = runner_outlet_command(command, grants, reply);
+                ENGINE_ACCEPT(aether_rexxae_reply(ctx, rc, reply, rc ? "OUTLET command rejected" : ""));
+                continue;
+            }
             if (session && session->apps) {
                 const char *target;
                 ENGINE_READ(target, aether_rexxae_address(ctx));
@@ -593,7 +605,11 @@ int runner_execute_touch(const char *source, unsigned grants, RunnerStats *stats
 #endif
 
 int runner_execute(const char *source, unsigned grants, RunnerStats *stats) {
+#ifdef RUNNER_PSK
+    if (grants & ~RUNNER_SIGNED_GRANTS) return -1;
+#else
     if (grants & ~RUNNER_GRANT_TIMERS) return -1;
+#endif
 #ifdef RUNNER_USB
     return runner_execute_touch(source, grants, stats, NULL, 0);
 #elif defined(RUNNER_HTTP)

@@ -27,6 +27,9 @@ bool runner_switch_acquire(const void *owner);
 bool runner_switch_session_finish(const void *owner, int seconds, bool success);
 void runner_switch_session_close(const void *owner);
 
+int runner_switch_owner_set(const void *owner, int seconds, bool toggle);
+int runner_switch_owner_remaining(const void *owner, bool *busy);
+
 bool runner_switch_init(void);
 bool runner_switch_available(void);
 bool runner_switch_on(void);

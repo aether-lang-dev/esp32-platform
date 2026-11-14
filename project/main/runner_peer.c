@@ -19,8 +19,9 @@ static bool encode_command(const char *command, char *encoded) {
     return true;
 }
 
-int runner_peer_call(const char *source, const char *command,
-                     char result[RUNNER_PEER_TEXT_LIMIT + 1], int *outcome) {
+int runner_peer_call_service(const char *source, const char *command, unsigned grants,
+                            RunnerPeerService service,
+                            char result[RUNNER_PEER_TEXT_LIMIT + 1], int *outcome) {
     char encoded[2 * RUNNER_PEER_TEXT_LIMIT + 3];
     *outcome = AETHER_OK;
     *result = 0;
@@ -45,7 +46,21 @@ int runner_peer_call(const char *source, const char *command,
             break;
         }
         if (step == REXXAE_RUNNABLE) continue;
-        /* No functions or ADDRESS environments are mounted in the peer. */
+        if (step == REXXAE_COMMAND && service) {
+            const char *target = aether_rexxae_address(peer);
+            *outcome = aether_last_outcome();
+            if (*outcome != AETHER_OK || !target) break;
+            const char *request = aether_rexxae_text(peer);
+            *outcome = aether_last_outcome();
+            if (*outcome != AETHER_OK || !request) break;
+            char response[RUNNER_PEER_TEXT_LIMIT + 1] = {0};
+            int code = service(target, request, grants, response);
+            int accepted = aether_rexxae_reply(peer, code, response, code ? "peer service rejected" : "");
+            *outcome = aether_last_outcome();
+            if (*outcome != AETHER_OK || accepted != 0) break;
+            continue;
+        }
+        /* Functions and unmounted ADDRESS environments remain denied. */
         if (step != REXXAE_SAY || replied) break;
         const char *text = aether_rexxae_text(peer);
         *outcome = aether_last_outcome();
@@ -67,6 +82,11 @@ cleanup:
     if (*outcome != AETHER_OK) rc = RUNNER_PEER_ERROR;
     if (rc != 0) *result = 0;
     return rc;
+}
+
+int runner_peer_call(const char *source, const char *command,
+                     char result[RUNNER_PEER_TEXT_LIMIT + 1], int *outcome) {
+    return runner_peer_call_service(source, command, 0, NULL, result, outcome);
 }
 
 bool runner_peer_check(const char *source) {

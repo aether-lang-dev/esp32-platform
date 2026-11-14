@@ -59,6 +59,12 @@ class BundleTests(unittest.TestCase):
         blob = self.bundle(grants=["TOUCH_EVENT", "WAIT_MS"])
         self.assertEqual(struct.unpack_from("<I", blob, 12)[0], 10)
 
+    def test_outlet_peer_grants_exclude_start_authority(self):
+        blob = self.bundle(grants=["OUTLET_READ", "OUTLET_CANCEL"])
+        self.assertEqual(struct.unpack_from("<I", blob, 12)[0], 40960)
+        with self.assertRaises(ValueError):
+            self.bundle(grants=["OUTLET_CONTROL"])
+
     def test_display_and_touch_grants_are_independent(self):
         blob = self.bundle(grants=["DISPLAY_BUTTONS", "TOUCH_EVENT"])
         self.assertEqual(struct.unpack_from("<I", blob, 12)[0], 24)

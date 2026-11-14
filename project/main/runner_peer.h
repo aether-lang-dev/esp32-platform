@@ -8,6 +8,11 @@ enum { RUNNER_PEER_TEXT_LIMIT = 128, RUNNER_PEER_ERROR = 20 };
 int runner_peer_call(const char *source, const char *command,
                      char result[RUNNER_PEER_TEXT_LIMIT + 1], int *outcome);
 
+typedef int (*RunnerPeerService)(const char *target, const char *command, unsigned grants, char *result);
+int runner_peer_call_service(const char *source, const char *command, unsigned grants,
+                            RunnerPeerService service,
+                            char result[RUNNER_PEER_TEXT_LIMIT + 1], int *outcome);
+
 /* Validate the firmware-owned LABELS v1 contract under a bounded account. */
 bool runner_peer_check(const char *source);
 
