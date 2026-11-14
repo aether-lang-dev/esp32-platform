@@ -143,16 +143,19 @@ def run(endpoint, context):
         assert request("/repl/command", b"ADDRESS APPS 'RUN main'\nSAY RC",
                        session=identifier, sequence=3)[0] == 202
         assert text(wait(identifier, 3)) == "13"
+        assert request("/repl/command", b"ADDRESS APPS 'CALL main status'\nSAY RC",
+                       session=identifier, sequence=4)[0] == 202
+        assert text(wait(identifier, 4)) == "13"
         assert request("/status")[1] == before
     finally:
         close_session(identifier)
     print("ADDRESS APPS inventory, status and read/run grant separation PASS", flush=True)
 
-    code, opened = request("/repl/open", b"2048")
+    code, opened = request("/repl/open", b"6144")
     assert code == 201, opened
     identifier = opened["session"]
     try:
-        source = b"ADDRESS APPS 'RUN main'\nticket = RESULT\nADDRESS APPS 'RUN main'\nSAY RC\nSAY ticket"
+        source = b"ADDRESS APPS 'RUN main'\nticket = RESULT\nADDRESS APPS 'CALL main status'\nSAY RC\nSAY ticket"
         assert request("/repl/command", source, session=identifier, sequence=1)[0] == 202
         state = wait(identifier, 1)
         outputs = [bytes.fromhex(event["hex"]).decode() for event in state["events"]]
@@ -172,3 +175,20 @@ def run(endpoint, context):
     finally:
         close_session(identifier)
     print("ADDRESS APPS queues the installed app, denies a busy rerun and preserves its slots PASS", flush=True)
+
+    code, opened = request("/repl/open", b"4096")
+    assert code == 201, opened
+    identifier = opened["session"]
+    try:
+        for sequence, (command, expected) in enumerate([
+            ("CALL main echo peer reply", "0peer reply"),
+            ("CALL main unknown", "4"),
+            ("CALL main status", "0S60 bench ready"),
+        ], 1):
+            source = ("ADDRESS APPS '" + command + "'\nSAY RC\nSAY RESULT").encode()
+            assert request("/repl/command", source, session=identifier, sequence=sequence)[0] == 202
+            assert text(wait(identifier, sequence)) == expected
+        assert request("/status")[1] == state, "service changed managed-app state"
+    finally:
+        close_session(identifier)
+    print("ADDRESS APPS signed service replies, error recovery and lifecycle isolation PASS", flush=True)

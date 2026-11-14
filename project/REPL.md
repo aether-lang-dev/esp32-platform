@@ -6,8 +6,8 @@ has a random identifier, fixed host-service grants and increasing command sequen
 numbers. The existing runner task executes both installed apps and REPL
 commands, keeping RexxAE contexts on their owning task.
 
-POST /repl/open takes an ASCII grant mask, using timer bits 1 and 2, APPS inspection bit 1024 and APPS run bit 2048.
-The local master controller requests all four bits (3075).
+POST /repl/open takes an ASCII grant mask, using timer bits 1 and 2, APPS inspection bit 1024 and APPS run bit 2048 and APPS call bit 4096.
+The local master controller requests all five bits (7171).
 The response contains a session identifier. Subsequent operations supply
 X-Repl-Session.
 
@@ -58,5 +58,25 @@ and replay metadata. RC 8 means busy, 13 denied, 4 invalid and 20 a store or
 queue fault. Inspect RC and RESULT with SAY after the ADDRESS command.
 
 The current inventory contains one logical app, main; its two A/B slots
-are release history. Peer calls, stop and replacement are not APPS commands
-yet. These grants belong to the interactive session, not signed manifests.
+are release history. Stop and replacement are not APPS commands yet. These grants belong to the interactive session, not signed manifests.
+
+### Signed request services
+
+`ADDRESS APPS 'CALL main echo hello'` requires the separate call grant 4096.
+RESULT is the service reply and RC its exit code. The signed source must start
+with the exact line `/* ADDRESS SERVICE main v1 */` followed by a newline.
+See scripts/examples/s60_service.rexx. This marker is signed along with the
+source; ordinary installed programs are rejected rather than executed as services.
+
+The host verifies and pins the installed bundle while holding its app-operation
+reservation. Each call uses a fresh Rexx context, seeded with ADDRESS_COMMAND.
+One SAY supplies the reply (at most 128 bytes), then EXIT supplies RC. No host
+functions or ADDRESS routes are mounted inside this context. The existing peer
+step bound and caller's deadline, cancellation and memory account apply. Calls
+do not share app variables or alter its installed lifecycle status. This is a
+stateless request service, not a resident app actor. Callbacks and nested calls
+are denied. A busy app-operation reservation returns RC 8; missing opt-in or
+invalid requests return 4; execution or storage failure returns 20.
+
+The service receives no hardware authority. Future services needing peripherals
+must have their own explicit host contracts and grants.

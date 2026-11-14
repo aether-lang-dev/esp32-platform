@@ -5,6 +5,7 @@
 #include "runner_psk.h"
 #include "runner_repl.h"
 #include "runner_apps.h"
+#include "runner_peer.h"
 #endif
 #ifdef RUNNER_SIGNED
 #include "runner_bundle.h"
@@ -34,6 +35,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 
 typedef struct { unsigned char *bytes; size_t length; unsigned id; } Upload;
 static QueueHandle_t uploads;
@@ -71,6 +73,32 @@ static int apps_start(unsigned *request) {
     return 0;
 }
 
+/* Called on the REPL's owning task, under its execution account. */
+static int apps_call(const char *command, char *result) {
+    result[0] = 0;
+    if (xSemaphoreTake(available, 0) != pdTRUE) return RUNNER_APPS_BUSY;
+    RunnerBundle active;
+    unsigned char *bytes = runner_store_load_active(trusted_keys,
+        sizeof trusted_keys / sizeof trusted_keys[0], &active);
+    int rc = RUNNER_APPS_FAULT;
+    result[0] = 0;
+    if (bytes) {
+        size_t marker = strlen(RUNNER_APPS_SERVICE_MARKER);
+        if (active.source_length >= marker &&
+            memcmp(active.source, RUNNER_APPS_SERVICE_MARKER, marker) == 0) {
+            ((unsigned char *)active.source)[active.source_length] = 0;
+            char reply[RUNNER_PEER_TEXT_LIMIT + 1];
+            int outcome;
+            rc = runner_peer_call((const char *)active.source, command, reply, &outcome);
+            if (rc == 0 && !*reply) rc = RUNNER_APPS_FAULT;
+            if (rc == 0) strcpy(result, reply);
+        } else rc = RUNNER_APPS_INVALID;
+        free(bytes);
+    }
+    xSemaphoreGive(available);
+    return rc;
+}
+
 static int apps_command(const char *command, unsigned grants, char *result) {
     RunnerStoreInfo store;
     runner_store_info(&store);
@@ -83,6 +111,9 @@ static int apps_command(const char *command, unsigned grants, char *result) {
     info.state = phase;
     info.request = generation;
     portEXIT_CRITICAL(&state_lock);
+    char verb[16];
+    if (sscanf(command, " %15s", verb) == 1 && !strcasecmp(verb, "CALL"))
+        return runner_apps_call(&info, command, grants, apps_call, result);
     return runner_apps_command(&info, command, grants, apps_start, result);
 }
 #endif

@@ -15,7 +15,17 @@ the repository.
 The page includes device status and a multiline Rexx REPL. Open a session,
 run commands, and use Cancel for an active command. Variables survive
 successful commands. Close and reopen to reset them. The device currently
-mounts UPTIME_MS and WAIT_MS for the interactive session.
+mounts UPTIME_MS, WAIT_MS and ADDRESS APPS for the interactive session.
+The master session requests separate inventory, run and service-call grants.
+For a signed app opting into the main v1 service contract, try:
+
+```rexx
+ADDRESS APPS 'CALL main status'
+SAY RC
+SAY RESULT
+```
+
+Service requests use fresh bounded contexts; see ../project/REPL.md.
 
 The REPL firmware must be installed first. Its protocol and bounds are in
 ../project/REPL.md. The controller reads the PSK from the configured local
