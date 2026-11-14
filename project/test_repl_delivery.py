@@ -31,7 +31,7 @@ def run(endpoint, context):
             assert code == 200, state
             if state["sequence"] == sequence and state["state"] == "done":
                 return state
-            time.sleep(0.05)
+            time.sleep(0.15)
         raise AssertionError("REPL completion deadline")
 
     def text(state):
@@ -187,7 +187,8 @@ def run(endpoint, context):
         ], 1):
             source = ("ADDRESS APPS '" + command + "'\nSAY RC\nSAY RESULT").encode()
             assert request("/repl/command", source, session=identifier, sequence=sequence)[0] == 202
-            assert text(wait(identifier, sequence)) == expected
+            reply = wait(identifier, sequence)
+            assert text(reply) == expected, (command, reply)
         assert request("/status")[1] == state, "service changed managed-app state"
     finally:
         close_session(identifier)
