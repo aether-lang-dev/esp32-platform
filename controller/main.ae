@@ -107,9 +107,14 @@ fn repl_action(req: ptr, res: ptr, device: string, credential: string, action: s
     sequence = int_field(signals, "seq")
     source = text_field(signals, "code")
     transcript = text_field(signals, "transcript")
+    submitted = source
+    if action == "run" {
+        if bool_field(signals, "showrc") { submitted = string.concat(submitted, "\nSAY 'RC =' RC") }
+        if bool_field(signals, "showresult") { submitted = string.concat(submitted, "\nSAY 'RESULT =' RESULT") }
+    }
     next = sequence
     if action == "run" { next = sequence + 1 }
-    raw = device_call(device, credential, action, sid, next, source)
+    raw = device_call(device, credential, action, sid, next, submitted)
     result, parse_error = json.parse(raw)
     if parse_error != "" { tinyweb.response_write_status(res, "Invalid transport result", 502); return }
     defer json.json_free(result)

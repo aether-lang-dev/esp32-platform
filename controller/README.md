@@ -14,7 +14,12 @@ the repository.
 
 The page includes device status and a multiline Rexx REPL. Open a session,
 run commands, and use Cancel for an active command. Variables survive
-successful commands. Close and reopen to reset them. The device currently
+successful commands. Close and reopen to reset them.
+Auto RC and Auto RESULT are independent toggle buttons, initially off.
+They append labelled SAY statements to each submission without changing the
+editor text. EXIT or RETURN skips these statements; errors also prevent them
+from running. Undefined variables display their Rexx names. Preferences last
+until the page is reloaded. The device currently
 mounts UPTIME_MS, WAIT_MS, ADDRESS APPS and ADDRESS SWITCH for the interactive session.
 The master session requests separate inventory, run, service-call and switch read/control grants.
 On S60, `ADDRESS SWITCH 'ON 5'` requests five seconds of relay power after

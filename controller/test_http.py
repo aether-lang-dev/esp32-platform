@@ -89,6 +89,23 @@ def run(origin):
         consume("/repl/run", dict(state))
         assert state["transcript"].endswith("41\n"), state
         print("Controller Cancel works during the stream; next command retains state PASS", flush=True)
+        # Inspect independently controlled echoes without device effects.
+        for showrc, showresult, expected in [
+            (True, False, "RC = 7\n"),
+            (False, True, "RESULT = toggle value\n"),
+            (True, True, "RC = 7\nRESULT = toggle value\n"),
+            (False, False, "RESULT = 'toggle value'\n"),
+        ]:
+            state.update(showrc=showrc, showresult=showresult)
+            state["code"] = "RC = 7\nRESULT = 'toggle value'"
+            consume("/repl/run", dict(state))
+            assert state["transcript"].endswith(expected), state
+        state.update(showrc=True, showresult=True)
+        state["code"] = "EXIT 0"
+        consume("/repl/run", dict(state))
+        assert state["transcript"].endswith("rexx> EXIT 0\n"), state
+        print("Controller independent RC/RESULT toggles and explicit EXIT behaviour PASS", flush=True)
+
     finally:
         consume("/repl/close", dict(state))
     assert not state["sid"], state
