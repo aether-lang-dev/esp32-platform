@@ -95,6 +95,7 @@ void runner_store_info_at(RunnerStoreId id, RunnerStoreInfo *info) {
     *info=(RunnerStoreInfo){.active_version=store->state.active_version,.highest_version=store->state.highest,
         .trial_version=store->state.trial==NONE?0:store->state.highest,.active_slot=store->state.active==NONE?-1:(int)store->state.active,.fault=store->fault};
     memcpy(info->active_fingerprint, store->state.active_fingerprint, sizeof info->active_fingerprint);
+    memcpy(info->name, store->state.name, sizeof info->name);
     portEXIT_CRITICAL(&lock);
 }
 static bool accepts(RunnerStoreId id, const RunnerBundle *bundle) {

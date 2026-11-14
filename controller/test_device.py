@@ -37,6 +37,16 @@ class DeviceStatusTests(unittest.TestCase):
                 "POST", "/repl/command", code.encode(), {
                     "X-Repl-Session": "a" * 32, "X-Repl-Sequence": "1"})
 
+    def test_master_session_requests_apps_and_timer_grants(self):
+        with patch.object(device, "client_context"), patch.object(device, "load") as load, \
+             patch.object(device.http.client, "HTTPSConnection") as connection:
+            load.return_value = ("unit-device", bytes(range(32)))
+            response = connection.return_value.getresponse.return_value
+            response.status = 200
+            response.read.return_value = b'{"session":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}'
+            device.repl_request("https://192.0.2.50", Path("/private/device.json"), "open")
+            connection.return_value.request.assert_called_once_with("POST", "/repl/open", b"3075", {})
+
     def test_repl_event_text_is_decoded_for_the_browser(self):
         with patch.object(device, "client_context"), patch.object(device, "load") as load, \
              patch.object(device.http.client, "HTTPSConnection") as connection:

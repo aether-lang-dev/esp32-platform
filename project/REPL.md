@@ -2,11 +2,12 @@
 
 The PSK firmware profiles expose a volatile REPL beside the installed
 application. Possession of the TLS PSK authorizes its operations. A session
-has a random identifier, fixed timer grants and increasing command sequence
+has a random identifier, fixed host-service grants and increasing command sequence
 numbers. The existing runner task executes both installed apps and REPL
 commands, keeping RexxAE contexts on their owning task.
 
-POST /repl/open takes an ASCII grant mask, currently 0 through 3.
+POST /repl/open takes an ASCII grant mask, using timer bits 1 and 2, APPS inspection bit 1024 and APPS run bit 2048.
+The local master controller requests all four bits (3075).
 The response contains a session identifier. Subsequent operations supply
 X-Repl-Session.
 
@@ -43,3 +44,19 @@ Datastar controller, cancellation, variable retention, Unicode output and
 memory-limit recovery. Installed release v4 and its replay floor survived
 the firmware update and remained unchanged through the REPL checks. The
 diagnostic pauses between polls, matching the controller's Wi-Fi cadence.
+
+## Managed apps through ADDRESS
+
+`ADDRESS APPS 'LIST'` returns the managed-app inventory in RESULT.
+`ADDRESS APPS 'STATUS main'` returns its installed name, versions, slot,
+runner state and request identifier. Both require grant 1024.
+
+`ADDRESS APPS 'RUN main'` requires grant 2048 and returns a queued request
+identifier. It runs after the current REPL command, on the normal app task
+with the installed app's own grants and budget. It preserves slot contents
+and replay metadata. RC 8 means busy, 13 denied, 4 invalid and 20 a store or
+queue fault. Inspect RC and RESULT with SAY after the ADDRESS command.
+
+The current inventory contains one logical app, main; its two A/B slots
+are release history. Peer calls, stop and replacement are not APPS commands
+yet. These grants belong to the interactive session, not signed manifests.

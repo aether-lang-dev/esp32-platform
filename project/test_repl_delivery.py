@@ -104,3 +104,71 @@ def run(endpoint, context):
     assert text(reset) == "X", reset
     request("/repl/close", b"", session=reopened["session"])
     print("REPL session reset and installed-app isolation PASS", flush=True)
+
+    def close_session(identifier):
+        request("/repl/close", b"", session=identifier)
+        deadline = time.monotonic() + 5
+        while request("/repl/events", session=identifier, after=0)[0] != 409:
+            assert time.monotonic() < deadline
+            time.sleep(0.15)
+
+    # Closing is asynchronous, so let the earlier session finish first.
+    deadline = time.monotonic() + 5
+    while request("/repl/events", session=reopened["session"], after=0)[0] != 409:
+        assert time.monotonic() < deadline
+        time.sleep(0.15)
+    code, opened = request("/repl/open", b"0")
+    assert code == 201, opened
+    identifier = opened["session"]
+    try:
+        assert request("/repl/command", b"ADDRESS APPS 'LIST'\nSAY RC",
+                       session=identifier, sequence=1)[0] == 202
+        assert text(wait(identifier, 1)) == "13"
+    finally:
+        close_session(identifier)
+
+    code, opened = request("/repl/open", b"1024")
+    assert code == 201, opened
+    identifier = opened["session"]
+    try:
+        assert request("/repl/command", b"ADDRESS APPS 'LIST'\nSAY RESULT",
+                       session=identifier, sequence=1)[0] == 202
+        registry = json.loads(text(wait(identifier, 1)))
+        assert len(registry) == 1 and registry[0]["app"] == "main" and registry[0]["installed"], registry
+        assert request("/repl/command", b"ADDRESS APPS 'STATUS main'\nSAY RESULT",
+                       session=identifier, sequence=2)[0] == 202
+        app = json.loads(text(wait(identifier, 2)))
+        assert app["activeVersion"] == before["activeVersion"] and app["highestVersion"] == before["highestVersion"], app
+        assert app["name"] == registry[0]["name"], app
+        assert request("/repl/command", b"ADDRESS APPS 'RUN main'\nSAY RC",
+                       session=identifier, sequence=3)[0] == 202
+        assert text(wait(identifier, 3)) == "13"
+        assert request("/status")[1] == before
+    finally:
+        close_session(identifier)
+    print("ADDRESS APPS inventory, status and read/run grant separation PASS", flush=True)
+
+    code, opened = request("/repl/open", b"2048")
+    assert code == 201, opened
+    identifier = opened["session"]
+    try:
+        source = b"ADDRESS APPS 'RUN main'\nticket = RESULT\nADDRESS APPS 'RUN main'\nSAY RC\nSAY ticket"
+        assert request("/repl/command", source, session=identifier, sequence=1)[0] == 202
+        state = wait(identifier, 1)
+        outputs = [bytes.fromhex(event["hex"]).decode() for event in state["events"]]
+        assert outputs[0] == "8", outputs
+        ticket = json.loads(outputs[1])
+        deadline = time.monotonic() + 15
+        while time.monotonic() < deadline:
+            state = request("/status")[1]
+            if state["id"] == ticket["queued"] and state["state"] in ("done", "error"):
+                break
+            time.sleep(0.15)
+        else:
+            raise AssertionError("queued app did not finish")
+        assert state["exitCode"] == 0 and state["runtimeOutcome"] == 0, state
+        for field in ("activeVersion", "highestVersion", "activeSlot", "activeFingerprint"):
+            assert state[field] == before[field], state
+    finally:
+        close_session(identifier)
+    print("ADDRESS APPS queues the installed app, denies a busy rerun and preserves its slots PASS", flush=True)

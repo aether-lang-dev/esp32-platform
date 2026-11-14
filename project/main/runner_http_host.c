@@ -4,6 +4,7 @@
 #ifdef RUNNER_PSK
 #include "runner_psk.h"
 #include "runner_repl.h"
+#include "runner_apps.h"
 #endif
 #ifdef RUNNER_SIGNED
 #include "runner_bundle.h"
@@ -43,6 +44,48 @@ static int exit_code;
 static int last_runtime_outcome;
 static const char *phase = "idle";
 static bool was_cancelled;
+
+#ifdef RUNNER_PSK
+static int apps_start(unsigned *request) {
+    if (xSemaphoreTake(available, 0) != pdTRUE) return RUNNER_APPS_BUSY;
+    portENTER_CRITICAL(&state_lock);
+    if (generation == UINT32_MAX) {
+        portEXIT_CRITICAL(&state_lock);
+        xSemaphoreGive(available);
+        return RUNNER_APPS_FAULT;
+    }
+    *request = ++generation;
+    phase = "pending";
+    exit_code = last_runtime_outcome = 0;
+    was_cancelled = false;
+    portEXIT_CRITICAL(&state_lock);
+    Upload run = {.id = *request};
+    if (xQueueSend(uploads, &run, 0) != pdTRUE) {
+        portENTER_CRITICAL(&state_lock);
+        phase = "error";
+        exit_code = -1;
+        portEXIT_CRITICAL(&state_lock);
+        xSemaphoreGive(available);
+        return RUNNER_APPS_FAULT;
+    }
+    return 0;
+}
+
+static int apps_command(const char *command, unsigned grants, char *result) {
+    RunnerStoreInfo store;
+    runner_store_info(&store);
+    RunnerAppsInfo info = {
+        .active_version = store.active_version, .highest_version = store.highest_version,
+        .trial_version = store.trial_version, .active_slot = store.active_slot, .fault = store.fault,
+    };
+    memcpy(info.name, store.name, sizeof info.name);
+    portENTER_CRITICAL(&state_lock);
+    info.state = phase;
+    info.request = generation;
+    portEXIT_CRITICAL(&state_lock);
+    return runner_apps_command(&info, command, grants, apps_start, result);
+}
+#endif
 
 static esp_err_t response(httpd_req_t *req, const char *status, const char *body) {
     httpd_resp_set_status(req, status);
@@ -194,7 +237,7 @@ static bool network_start(void) {
     ESP_ERROR_CHECK(httpd_register_uri_handler(server, &post));
     ESP_ERROR_CHECK(httpd_register_uri_handler(server, &get));
 #ifdef RUNNER_PSK
-    ESP_ERROR_CHECK(runner_repl_start(server));
+    ESP_ERROR_CHECK(runner_repl_start(server, apps_command));
 #endif
 #ifdef RUNNER_WIFI
     puts("SIGNED CYD Wi-Fi endpoint started");
@@ -212,15 +255,16 @@ static int run_bundle(RunnerBundle *bundle, RunnerStats *stats) {
     ((unsigned char *)bundle->source)[bundle->source_length] = 0;
     return runner_execute((const char *)bundle->source, bundle->grants, stats);
 }
-static int restore_active(void) {
+static int restore_active(RunnerStats *stats) {
     RunnerStoreInfo info; runner_store_info(&info);
     if (!info.active_version) return 0;
     RunnerBundle active;
     unsigned char *bytes = runner_store_load_active(trusted_keys,
         sizeof trusted_keys / sizeof trusted_keys[0], &active);
     if (!bytes) { puts("SIGNED active release could not be verified/read"); return -1; }
-    RunnerStats stats;
-    int result = run_bundle(&active, &stats);
+    RunnerStats boot_stats;
+    if (!stats) stats = &boot_stats;
+    int result = run_bundle(&active, stats);
     printf("SIGNED restored active v%lu exit=%d\n", (unsigned long)active.version, result);
     free(bytes);
     return result;
@@ -242,7 +286,7 @@ void app_main(void) {
     xSemaphoreGive(available);
 #ifdef RUNNER_SIGNED
     int boot = runner_store_init();
-    if (!boot) boot = restore_active();
+    if (!boot) boot = restore_active(NULL);
     if (boot) { phase = "error"; exit_code = -1; }
 #endif
     if (!network_start()) return;
@@ -261,13 +305,15 @@ void app_main(void) {
         int result = -1;
 #ifdef RUNNER_SIGNED
         RunnerBundle candidate;
-        if (runner_store_stage(upload.bytes, upload.length, trusted_keys,
+        if (!upload.bytes) {
+            result = restore_active(&stats);
+        } else if (runner_store_stage(upload.bytes, upload.length, trusted_keys,
                 sizeof trusted_keys / sizeof trusted_keys[0], &candidate) == 0) {
             printf("SIGNED trial %s v%lu key=%s grants=%u\n", candidate.name,
                    (unsigned long)candidate.version, candidate.key_id, candidate.grants);
             result = run_bundle(&candidate, &stats);
             if (runner_store_finish(result == 0) != 0) result = -1;
-            if (result != 0) (void)restore_active();
+            if (result != 0) (void)restore_active(NULL);
         }
 #else
         const esp_partition_t *slot = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, 0x40, "script_b");

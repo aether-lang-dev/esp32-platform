@@ -101,7 +101,7 @@ static bool is_cancelled(void *argument) {
 static esp_err_t open_session(httpd_req_t *req) {
     char *text = body(req);
     unsigned requested;
-    if (!text || !number(text, &requested) || requested & ~RUNNER_GRANT_TIMERS) {
+    if (!text || !number(text, &requested) || requested & ~RUNNER_REPL_GRANTS) {
         free(text);
         return reply(req, "400 Bad Request", "{\"error\":\"invalid session grants\"}");
     }
@@ -205,10 +205,10 @@ static esp_err_t read_events(httpd_req_t *req) {
     return sent;
 }
 
-esp_err_t runner_repl_start(httpd_handle_t server) {
+esp_err_t runner_repl_start(httpd_handle_t server, RunnerAppsCommand apps) {
     lock = xSemaphoreCreateMutex();
     if (!lock) return ESP_ERR_NO_MEM;
-    engine = (RunnerSession){.output = output, .cancelled = is_cancelled};
+    engine = (RunnerSession){.apps = apps, .output = output, .cancelled = is_cancelled};
     const httpd_uri_t routes[] = {
         {.uri = "/repl/open", .method = HTTP_POST, .handler = open_session},
         {.uri = "/repl/command", .method = HTTP_POST, .handler = submit},

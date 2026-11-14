@@ -30,7 +30,9 @@ typedef struct {
     bool cancelled;
 } RunnerStats;
 #ifdef RUNNER_PSK
+typedef int (*RunnerAppsCommand)(const char *command, unsigned grants, char *result);
 typedef struct {
+    RunnerAppsCommand apps;
     void *context, *account, *memory;
     void (*output)(void *argument, const char *kind, const char *text);
     bool (*cancelled)(void *argument);

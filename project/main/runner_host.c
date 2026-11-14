@@ -2,6 +2,9 @@
 #include "rexxae.h"
 #include "libaether.h"
 #include "runner_host.h"
+#ifdef RUNNER_PSK
+#include "runner_apps.h"
+#endif
 #if defined(RUNNER_CYD_CONSOLE) || defined(RUNNER_WIFI) || defined(RUNNER_USB)
 #include "cyd_console.h"
 #endif
@@ -109,7 +112,11 @@ static int execute(const char *source, unsigned grants, RunnerStats *stats
     const char *peripheral_function = demo_function(peripheral);
     if (grants & ~(RUNNER_GRANT_TIMERS | RUNNER_GRANT_LED)) return -1;
 #else
-    if (grants & ~RUNNER_SIGNED_GRANTS) return -1;
+    unsigned allowed = RUNNER_SIGNED_GRANTS;
+#ifdef RUNNER_PSK
+    if (session) allowed = RUNNER_REPL_GRANTS;
+#endif
+    if (grants & ~allowed) return -1;
 #endif
 #ifdef RUNNER_USB
     CydLayout screen = {0};
@@ -277,6 +284,22 @@ static int execute(const char *source, unsigned grants, RunnerStats *stats
             cyd_console_line(text);
 #endif
         } else if (status == REXXAE_COMMAND) {
+#ifdef RUNNER_PSK
+            if (session && session->apps) {
+                const char *target;
+                ENGINE_READ(target, aether_rexxae_address(ctx));
+                if (target && !strcasecmp(target, "APPS")) {
+                    const char *command;
+                    ENGINE_READ(command, aether_rexxae_text(ctx));
+                    if (!command) goto cleanup;
+                    char response[RUNNER_APPS_RESULT_LIMIT];
+                    int rc = session->apps(command, grants, response);
+                    ENGINE_ACCEPT(aether_rexxae_reply(ctx, rc, response,
+                        rc == 0 ? "" : "APPS command rejected"));
+                    continue;
+                }
+            }
+#endif
 #ifdef RUNNER_USB
             const char *target;
             ENGINE_READ(target, aether_rexxae_address(ctx));

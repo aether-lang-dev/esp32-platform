@@ -7,6 +7,7 @@ typedef struct {
     int active_slot;
     bool fault;
     char active_fingerprint[65];
+    char name[65];
 } RunnerStoreInfo;
 typedef enum { RUNNER_STORE_APP, RUNNER_STORE_LABELS } RunnerStoreId;
 #define RUNNER_LABELS_BUNDLE "peer.labels.v1"
