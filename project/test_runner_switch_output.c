@@ -33,6 +33,17 @@ static bool drive(bool on) {
 
 int main(void) {
     int first = 0, second = 0;
+    RunnerSwitchLease lease = {0};
+    assert(!runner_lease_claim(&lease, NULL));
+    assert(runner_lease_claim(&lease, &first));
+    assert(runner_lease_claim(&lease, &first));
+    assert(!runner_lease_claim(&lease, &second));
+    assert(!runner_lease_release(&lease, &second));
+    assert(lease.owner == &first);
+    assert(runner_lease_release(&lease, &first));
+    assert(runner_lease_claim(&lease, &second));
+    assert(!runner_lease_release(&lease, &first));
+    assert(runner_lease_release(&lease, &second));
     RunnerSwitchOutput output = {.drive = drive};
     assert(runner_output_claim(&output, &first));
     assert(!level && writes == 1);

@@ -20,6 +20,13 @@ bool runner_output_claim(RunnerSwitchOutput *output, const void *owner);
 bool runner_output_write(const RunnerSwitchOutput *output, const void *owner, bool on);
 bool runner_output_release(RunnerSwitchOutput *output, const void *owner);
 
+typedef struct { const void *owner; } RunnerSwitchLease;
+bool runner_lease_claim(RunnerSwitchLease *lease, const void *owner);
+bool runner_lease_release(RunnerSwitchLease *lease, const void *owner);
+bool runner_switch_acquire(const void *owner);
+bool runner_switch_session_finish(const void *owner, int seconds, bool success);
+void runner_switch_session_close(const void *owner);
+
 bool runner_switch_init(void);
 bool runner_switch_available(void);
 bool runner_switch_on(void);

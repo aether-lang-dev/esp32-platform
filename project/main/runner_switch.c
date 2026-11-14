@@ -54,3 +54,15 @@ bool runner_output_release(RunnerSwitchOutput *output, const void *owner) {
     output->owner = NULL;
     return true;
 }
+
+bool runner_lease_claim(RunnerSwitchLease *lease, const void *owner) {
+    if (!owner || (lease->owner && lease->owner != owner)) return false;
+    lease->owner = owner;
+    return true;
+}
+
+bool runner_lease_release(RunnerSwitchLease *lease, const void *owner) {
+    if (!owner || lease->owner != owner) return false;
+    lease->owner = NULL;
+    return true;
+}
