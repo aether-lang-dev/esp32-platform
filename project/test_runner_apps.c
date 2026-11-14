@@ -11,6 +11,12 @@ static int start(unsigned *request) {
     return next_rc;
 }
 
+static int service(const char *command, char *result) {
+    ++calls;
+    strcpy(result, command);
+    return 0;
+}
+
 int main(void) {
     RunnerAppsInfo info = {.name = "bench", .active_version = 4, .highest_version = 5,
                           .active_slot = 1, .state = "idle"};
@@ -41,6 +47,14 @@ int main(void) {
     next_rc = 0;
     assert(runner_apps_command(&info, "RUN main", all, start, result) == 0 && calls == 2);
     assert(strstr(result, "\"queued\":7"));
+    unsigned prior = calls;
+    assert(runner_apps_call(&info, "CALL main echo hello", 0, service, result) == 13 && calls == prior);
+    assert(runner_apps_call(&info, "CALL other echo hello", 4096, service, result) == 4);
+    assert(runner_apps_call(&info, "CALL main", 4096, service, result) == 4);
+    assert(runner_apps_call(&info, "call MAIN echo hello", 4096, service, result) == 0);
+    assert(strcmp(result, "echo hello") == 0 && calls == prior + 1);
+    info.fault = true;
+    assert(runner_apps_call(&info, "CALL main status", 4096, service, result) == 20);
     puts("APPS registry, parsing, grants, faults and queued execution PASS");
     return 0;
 }

@@ -16,6 +16,11 @@ typedef struct {
     unsigned request;
 } RunnerAppsInfo;
 
+/* CALL is opt-in; each request gets a fresh bounded Rexx context. */
+#define RUNNER_APPS_SERVICE_MARKER "/* ADDRESS SERVICE main v1 */\n"
+int runner_apps_call(const RunnerAppsInfo *info, const char *command, unsigned grants,
+                     int (*call)(const char *, char *), char result[RUNNER_APPS_RESULT_LIMIT]);
+
 /* The host owns the registry and queues execution on the normal app task. */
 int runner_apps_command(const RunnerAppsInfo *info, const char *command, unsigned grants,
                         int (*start)(unsigned *request), char result[RUNNER_APPS_RESULT_LIMIT]);

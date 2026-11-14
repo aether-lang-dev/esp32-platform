@@ -41,3 +41,19 @@ int runner_apps_command(const RunnerAppsInfo *info, const char *command, unsigne
     }
     return rejected(result, RUNNER_APPS_INVALID, "unknown APPS command");
 }
+
+int runner_apps_call(const RunnerAppsInfo *info, const char *command, unsigned grants,
+                     int (*call)(const char *, char *), char result[RUNNER_APPS_RESULT_LIMIT]) {
+    char verb[16], app[65];
+    int offset = 0;
+    if (sscanf(command, " %15s %64s %n", verb, app, &offset) != 2 ||
+        strcasecmp(verb, "CALL") || strcasecmp(app, "main") || !offset || !command[offset])
+        return rejected(result, RUNNER_APPS_INVALID, "expected CALL main command");
+    if (!(grants & RUNNER_GRANT_APPS_CALL))
+        return rejected(result, RUNNER_APPS_DENIED, "APPS call not granted");
+    if (info->fault) return rejected(result, RUNNER_APPS_FAULT, "application store unavailable");
+    if (!info->active_version) return rejected(result, RUNNER_APPS_INVALID, "no installed application");
+    if (strlen(command + offset) > 128)
+        return rejected(result, RUNNER_APPS_INVALID, "service command too long");
+    return call(command + offset, result);
+}
