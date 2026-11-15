@@ -162,7 +162,8 @@ tar -C "$REXXAE_DIR" -cf - include | tar -C "$tmp/rexxae" -xf -
 
 # Freeze lane inputs too: an edit during a long build must not change the
 # running shell script or its project halfway through a container run.
-cp -R "$HERE/project" "$HERE/scripts" "$HERE/tools" "$tmp/"
+cp -R "$HERE/firmware/esp-idf" "$tmp/project"
+cp -R "$HERE/scripts" "$HERE/tools" "$tmp/"
 cp "$HERE/in_container.sh" "$tmp/in_container.sh"
 "$ENGINE" run --rm \
     -e REXX_TEST_OUTLET="${REXX_TEST_OUTLET:-}" \

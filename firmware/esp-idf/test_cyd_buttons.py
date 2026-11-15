@@ -23,7 +23,7 @@ def check(library):
     reply = bind("reply_value", integer, handle, string, string)
     exit_code = bind("exit_code", integer, handle)
     output = bind("text", string, handle)
-    source = (Path(__file__).resolve().parents[1] / "scripts/examples/signed_buttons.rexx").read_bytes()
+    source = (Path(__file__).resolve().parents[2] / "scripts/examples/signed_buttons.rexx").read_bytes()
 
     def run(tap):
         context = create(source)

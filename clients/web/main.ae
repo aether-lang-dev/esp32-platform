@@ -36,7 +36,7 @@ fn device_call(device: string, credential: string, action: string,
                session: string, sequence: int, source: string) -> string {
     args = list.new()
     defer list.free(args)
-    list.add(args, "controller/device.py")
+    list.add(args, "clients/web/device.py")
     list.add(args, "--device")
     list.add(args, device)
     list.add(args, "--credential")
@@ -176,13 +176,13 @@ fn repl_action(req: ptr, res: ptr, device: string, credential: string, action: s
 
 main() {
     if os.args_count() != 3 {
-        println("Usage: controller/run.sh https://device-address /absolute/device.json")
+        println("Usage: clients/web/run.sh https://device-address /absolute/device.json")
         return 1
     }
     device = os.args_get(1)
     credential = os.args_get(2)
-    page, perr = file.read("controller/index.html")
-    script, jerr = file.read("controller/assets/datastar.js")
+    page, perr = file.read("clients/web/index.html")
+    script, jerr = file.read("clients/web/assets/datastar.js")
     if perr != "" || jerr != "" {
         println("Run the controller from the ESP32 repository root")
         return 1

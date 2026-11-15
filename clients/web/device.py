@@ -8,7 +8,7 @@ import runpy
 import sys
 from urllib.parse import urlsplit
 
-TOOLS = Path(__file__).resolve().parents[1] / "tools"
+TOOLS = Path(__file__).resolve().parents[2] / "tools"
 sys.path.insert(0, str(TOOLS))
 Runner = runpy.run_path(str(TOOLS / "rexx"))["Runner"]
 from rexx_psk import client_context, load
