@@ -4,8 +4,8 @@ Local fix: pure-Aether TLS1.3 external PSK, on branch codex/esp32-external-psk
 commit dd7e3aa06bd8ace94675a8888e11371d120032f9. The native adapter reaches
 the actual S60 (active6/floor6). Independent positive/negative/HRR, native
 framing/deadline, crypto-wipe and existing resumption tests pass. No firmware
-TLS downgrade. The rebuilt phone app is installed; on-phone connection awaits
-unlock and must still be observed. The history below describes the replaced
+TLS downgrade. The signed iPhone15 Pro app passed the independent synthetic
+TLS1.3 test, then reached the actual S60 and reported active6/floor6. The history below describes the replaced
 Apple Network.framework provider.
 
 2026-11-15. This is an observed integration gap, not proof that all Apple

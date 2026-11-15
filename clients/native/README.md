@@ -2,8 +2,9 @@
 
 app.ae is the Aether UI entry point. The development iPhone bundle now has
 local-only Keychain import and a pure-Aether TLS1.3 external-PSK provider.
-The native adapter reaches the real S60 from the Mac. The updated app is
-signed and installed; final phone-side validation needs an unlocked phone.
+The native adapter reaches the real S60 from both Mac and iPhone. The signed
+iPhone app passed a synthetic TLS1.3 peer and reports app v6 / replay floor6
+from the plug using its existing PSK configuration.
 See ios/README.md for the exact local Aether pin, tests and credential boundary.
 
 Check the portable source against that dependency:
@@ -23,7 +24,6 @@ under ios/. Use the toolkit's existing backend ABI and build conventions.
 Do not vendor or fork the toolkit just to package this app. The firmware
 AETHER_REF does not automatically select a compatible native UI toolchain.
 
-Next: finish the phone-side synthetic and real-device proofs, then add the
-read-only Rexx console operation.
+Next: add the read-only Rexx console operation.
 Read ../../docs/REPOSITORY.md for the boundary and ../core/README.md for shared
 logic. Working browser UI remains at ../web/.

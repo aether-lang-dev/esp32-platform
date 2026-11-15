@@ -74,8 +74,9 @@ separate tests cover X25519, P256 retry, socket ownership, identity/key refusal,
 certificate/TLS1.2 refusal and input bounds. A resumption-binder mutation makes
 the independent handshake fail. Existing resumption/0RTT tests also pass.
 
-The updated app is signed and installed. The phone-side proof still requires
-an unlocked phone; do not equate app installation or Mac success with an
-observed phone connection. See asks/apple-external-psk-tls13.md for the original
+On 2026-11-15 the signed app on the attached iPhone15 Pro negotiated TLS1.3
+with the independent synthetic peer, then connected to the actual S60 and
+reported app v6 / replay floor6. The owner credential was imported into the
+local-only Keychain after the synthetic proof. No relay command was sent. See asks/apple-external-psk-tls13.md for the original
 Apple-provider finding and current validation status. QR enrollment and
 per-phone public-key authentication remain separate work.
