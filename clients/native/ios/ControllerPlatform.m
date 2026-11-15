@@ -1,6 +1,7 @@
 #import "ControllerTransport.h"
 #import "ControllerConsole.h"
 #import "ControllerHistory.h"
+#import "ControllerActions.h"
 #import <Security/Security.h>
 #import <UIKit/UIKit.h>
 static NSString *display = @"Ready · tap Check plug status";
@@ -182,3 +183,39 @@ void controller_console_recall(int direction,const char *source) {
 }
 const char *controller_console_recalled(void) { return recalled.UTF8String; }
 int controller_console_recalled_length(void) { return (int)[recalled lengthOfBytesUsingEncoding:NSUTF8StringEncoding]; }
+
+static NSMutableDictionary<NSString *,NSString *> *actionValues;
+static int actionRevision;
+static NSString *actionLabel(NSString *identifier) {
+    return @{@"app":@"App",@"relay":@"Relay",@"countdown":@"Countdown"}[identifier] ?: @"Action";
+}
+static void actionPublish(NSString *identifier,NSString *text) {
+    if (!actionValues) actionValues=[NSMutableDictionary dictionary];
+    actionValues[identifier]=text; actionRevision++;
+    NSURL *cache=[[[NSFileManager defaultManager] URLsForDirectory:NSCachesDirectory inDomains:NSUserDomainMask] firstObject];
+    [[NSJSONSerialization dataWithJSONObject:actionValues options:0 error:nil] writeToURL:[cache URLByAppendingPathComponent:@"named-actions.json"] atomically:YES];
+}
+static NSString *actionText(void) {
+    return [@[(actionValues[@"app"] ?: @"App: not checked"),
+              (actionValues[@"relay"] ?: @"Relay: not checked"),
+              (actionValues[@"countdown"] ?: @"Countdown: not checked")] componentsJoinedByString:@"\n"];
+}
+const char *controller_actions_text(void) { return actionText().UTF8String; }
+int controller_actions_length(void) { return (int)[actionText() lengthOfBytesUsingEncoding:NSUTF8StringEncoding]; }
+int controller_actions_revision(void) { return actionRevision; }
+void controller_named_action(const char *name) {
+    NSString *identifier=name ? [NSString stringWithUTF8String:name] : nil;
+    NSString *source=ControllerActionSource(identifier);
+    if (!source) return;
+    ControllerConsole *owner=ownerConsole();
+    if (!owner) { actionPublish(identifier,[NSString stringWithFormat:@"%@: import an owner credential first",actionLabel(identifier)]); return; }
+    if (owner.busy) { actionPublish(identifier,[NSString stringWithFormat:@"%@: console busy · try again when idle",actionLabel(identifier)]); return; }
+    actionPublish(identifier,[NSString stringWithFormat:@"%@: checking…",actionLabel(identifier)]);
+    [owner runNamedSource:source completion:^(NSString *output,NSString *error){
+        NSString *failure=error;
+        NSString *summary=error ? nil : ControllerActionSummary(identifier,output,&failure);
+        NSDateFormatter *clock=[NSDateFormatter new]; clock.dateFormat=@"HH:mm:ss";
+        NSString *text=summary ?: [NSString stringWithFormat:@"%@: unavailable · %@",actionLabel(identifier),failure ?: @"invalid response"];
+        actionPublish(identifier,[NSString stringWithFormat:@"%@ · %@",text,[clock stringFromDate:[NSDate date]]]);
+    }];
+}

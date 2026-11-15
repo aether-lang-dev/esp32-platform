@@ -6,7 +6,9 @@ import tempfile
 
 here = Path(__file__).resolve().parent
 team = os.environ['IOS_TEAM']
-device = os.environ['IOS_DEVICE']
+build_only = os.environ.get('TOUCH_BUILD_ONLY') == '1'
+device = os.environ.get('IOS_DEVICE')
+assert build_only or device, 'Set IOS_DEVICE for a real-device run'
 idle_seconds = float(os.environ.get('CONSOLE_IDLE_SECONDS', '125'))
 assert 0 <= idle_seconds <= 180
 with tempfile.TemporaryDirectory(prefix='controller-touch-') as folder:
@@ -34,6 +36,7 @@ with tempfile.TemporaryDirectory(prefix='controller-touch-') as folder:
 <Scheme version="1.7"><BuildAction><BuildActionEntries><BuildActionEntry buildForTesting="YES"><BuildableReference BuildableIdentifier="primary" BlueprintIdentifier="A00000000000000000000007" BuildableName="TouchTests.xctest" BlueprintName="TouchTests" ReferencedContainer="container:Touch.xcodeproj"/></BuildActionEntry></BuildActionEntries></BuildAction><TestAction buildConfiguration="Debug"><EnvironmentVariables><EnvironmentVariable key="CONSOLE_IDLE_SECONDS" value="IDLE_SECONDS" isEnabled="YES"/></EnvironmentVariables><Testables><TestableReference skipped="NO"><BuildableReference BuildableIdentifier="primary" BlueprintIdentifier="A00000000000000000000007" BuildableName="TouchTests.xctest" BlueprintName="TouchTests" ReferencedContainer="container:Touch.xcodeproj"/></TestableReference></Testables></TestAction></Scheme>
 '''.replace('IDLE_SECONDS',str(idle_seconds)))
     result = os.environ.get('TOUCH_RESULT', '/tmp/controller-touch.xcresult')
-    subprocess.run(['xcodebuild','-project',str(project),'-scheme','Touch','-destination','id='+device,
+    selection = ['-only-testing:'+os.environ['TOUCH_ONLY']] if os.environ.get('TOUCH_ONLY') else []
+    subprocess.run(['xcodebuild','-project',str(project),'-scheme','Touch','-destination',('generic/platform=iOS' if build_only else 'id='+device),
                     '-derivedDataPath',str(root/'dd'),'-allowProvisioningUpdates','-allowProvisioningDeviceRegistration',
-                    '-resultBundlePath',result,'test'],check=True,timeout=300)
+                    '-resultBundlePath',result,*selection,('build-for-testing' if build_only else 'test')],check=True,timeout=300)

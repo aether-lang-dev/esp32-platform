@@ -32,7 +32,7 @@ def replace(old, new):
 replace('ROOT="$(cd "$(dirname "$0")/.." && pwd)"', 'ROOT="$AETHER_UI_DIR"')
 replace('OUT="$ROOT/target/ios/$APP"', 'OUT="$CONTROLLER_BUILD/app"')
 replace('RUNTIME="$ROOT/target/ios/libaether_ios.a"', 'RUNTIME="$CONTROLLER_BUILD/libaether_ios.a"')
-replace('"$ROOT/backend/aether_ui_uikit.m" \\', '"$CONTROLLER_BUILD/transport/ControllerTLS.c" \\\n         "$CONTROLLER_SOURCE/ios/ControllerCredential.m" \\\n         "$CONTROLLER_SOURCE/ios/ControllerTransport.m" \\\n         "$CONTROLLER_SOURCE/ios/ControllerHistory.m" \\\n         "$CONTROLLER_SOURCE/ios/ControllerConsole.m" \\\n         "$CONTROLLER_SOURCE/ios/ControllerPlatform.m" \\\n         "$ROOT/backend/aether_ui_uikit.m" \\')
+replace('"$ROOT/backend/aether_ui_uikit.m" \\', '"$CONTROLLER_BUILD/transport/ControllerTLS.c" \\\n         "$CONTROLLER_SOURCE/ios/ControllerCredential.m" \\\n         "$CONTROLLER_SOURCE/ios/ControllerTransport.m" \\\n         "$CONTROLLER_SOURCE/ios/ControllerActions.m" \\\n         "$CONTROLLER_SOURCE/ios/ControllerHistory.m" \\\n         "$CONTROLLER_SOURCE/ios/ControllerConsole.m" \\\n         "$CONTROLLER_SOURCE/ios/ControllerPlatform.m" \\\n         "$ROOT/backend/aether_ui_uikit.m" \\')
 replace('-I"$ROOT/backend"', '-I"$ROOT/backend" -I"$CONTROLLER_BUILD/transport"')
 replace('-framework UserNotifications -lm"', '-framework UserNotifications -framework Network -framework Security -lm"')
 replace('<key>CFBundleDisplayName</key><string>$APP</string>', '<key>CFBundleDisplayName</key><string>Device Console</string>')

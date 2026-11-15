@@ -36,3 +36,8 @@ Current phone build b017 adds foreground session keepalive/status, Clear output,
 Jump to latest, Previous/Next command recall with draft restoration, and a Done
 control on the code keyboard. The full physical-phone XCTest passed, including
 retaining a variable through125seconds idle, typing, cancellation and reset.
+
+Prepared b018 adds a Smart plug panel with named App status, Relay status and
+Countdown status actions through Rexx ADDRESS. Independent TLS and firmware
+permission checks pass; the signed build awaits phone installation and live
+S60 verification because both devices were unavailable. Control stays denied.

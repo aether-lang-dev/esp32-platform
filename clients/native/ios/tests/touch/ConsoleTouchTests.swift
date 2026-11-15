@@ -18,6 +18,28 @@ final class ConsoleTouchTests: XCTestCase {
         let text = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", fragment)).firstMatch
         XCTAssertTrue(text.waitForExistence(timeout: 15), "Missing output: \(fragment)\n\(app.debugDescription)")
     }
+    func testNamedActions() {
+        continueAfterFailure = false
+        let app = XCUIApplication(bundleIdentifier: "dev.aether.controller")
+        if app.state == .runningForeground || app.state == .runningBackground { app.activate() } else { app.launch() }
+        XCTAssertTrue(app.staticTexts["Device Console · b018"].waitForExistence(timeout: 15))
+        tap("Reset session", in: app)
+        tap("App status", in: app)
+        output("App: s60-bench · v6 · floor 6", in: app)
+        tap("Relay status", in: app)
+        let relay = app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'Relay: OFF' OR label CONTAINS 'Relay: ON'")).firstMatch
+        XCTAssertTrue(relay.waitForExistence(timeout: 15))
+        tap("Countdown status", in: app)
+        output("Countdown: ", in: app)
+        let checked = app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'Countdown: idle ·' OR label CONTAINS 'Countdown: running ·'")).firstMatch
+        XCTAssertTrue(checked.waitForExistence(timeout: 15))
+        // Named queries share the contained session, but must not fill the editor.
+        XCTAssertEqual(app.textViews.firstMatch.value as? String, "SAY 6 * 7")
+        tap("Previous", in: app)
+        XCTAssertEqual(app.textViews.firstMatch.value as? String, "SAY 6 * 7")
+        tap("Reset session", in: app)
+        XCTAssertEqual(app.state, .runningForeground)
+    }
     func testEverydayConsole() {
         continueAfterFailure = false
         let app = XCUIApplication(bundleIdentifier: "dev.aether.controller")
@@ -27,7 +49,7 @@ final class ConsoleTouchTests: XCTestCase {
         } else {
             app.launch()
         }
-        XCTAssertTrue(app.staticTexts["Device Console · b017"].waitForExistence(timeout: 15))
+        XCTAssertTrue(app.staticTexts["Device Console · b018"].waitForExistence(timeout: 15))
         tap("Check plug status", in: app)
         output("Connected · app v6", in: app)
         tap("Reset session", in: app)

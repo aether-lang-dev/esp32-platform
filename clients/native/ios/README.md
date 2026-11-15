@@ -92,9 +92,9 @@ and trimmed with a visible marker. Code input disables smart quotes, smart
 dashes, autocapitalization and autocorrection; Run dismisses the keyboard.
 
 ControllerConsole owns its own device REPL session and variables. It does not
-replace, restart or change the installed signed app. The initial grant mask1027
-permits timers and read-only ADDRESS APPS LIST/STATUS. SWITCH, OUTLET control,
-APPS RUN and APPS CALL are denied. This console is not yet a relay remote.
+replace, restart or change the installed signed app. The b011 initial grant mask1027 permitted timers and read-only ADDRESS APPS
+LIST/STATUS. Build b018 adds SWITCH_READ and OUTLET_READ (mask9283) for named
+status actions. Relay/countdown control, APPS RUN and APPS CALL remain denied. This console is not yet a relay remote.
 
 Commands are capped at8192UTF-8 bytes including automatic RC/RESULT statements.
 Native code constructs fixed routes and session/sequence headers; source goes
@@ -228,3 +228,57 @@ smaller value for a quick UI smoke run; that does not prove lease retention past
 the firmware's idle limit. The runner activates an already-running app when
 possible, avoiding the intermittent cold-launch control connection failure seen
 with this Xcode/iOS combination. Use a fresh TOUCH_RESULT output path per run.
+
+
+## Named read-only actions (b018)
+
+The Smart plug panel supplies App status, Relay status and Countdown status.
+Each button maps an allowlisted identifier to fixed Rexx source. The fragments
+ADDRESS APPS STATUS main, SWITCH STATUS or OUTLET STATUS, then emit a framed
+RC/RESULT reply. No user source is interpolated and no new HTTP endpoint or
+device firmware is added. The existing REPL session's host grant mask9283 consists
+only of timers, APPS_READ, SWITCH_READ and OUTLET_READ. Typed console commands
+also gain those two read capabilities; control remains denied by the host.
+
+A named invocation captures only its own output, bounded to16384UTF-16 units,
+across event polls. Source echoed in history, earlier output and later commands
+are excluded. Missing/duplicate markers, nonzero RC, invalid typed status data,
+lost output, runtime failure or cancellation cannot produce a successful panel
+result. Each status has its own check time; unavailable replaces that action's
+old value rather than leaving a stale success. Actions are manual snapshots,
+not a live relay/countdown monitor. Busy requests are rejected without queueing.
+
+The generated Rexx is visible in the console transcript, while Previous/Next
+remain a history of typed commands. No named action starts the relay, changes
+the countdown, runs/replaces a managed app or expands a peer's own grants.
+
+Validation completed locally: native allowlist/framing/schema/capture tests;
+exact mask9283 checked against firmware read/control permission functions with
+no effects; an independent TLS peer passes all three actions and fragmented
+replies, with four negative cases (denied read, malformed result, output loss,
+runtime failure). The updated ordinary console lifecycle regression also runs.
+The new physical-phone test compiles and signs in build-only mode.
+
+Live proof is pending: the phone USB connection and S60 at192.168.0.119 were
+unavailable while this build was prepared. b018 is signed but not installed;
+no real-device status or on-phone action test is claimed yet. Hardware recovery
+and TLS endpoints were both unreachable; credentials were never sent to HTTP.
+
+```
+clients/native/ios/tests/check.sh
+AETHER_TLS_DIR=/path/to/tested/aether CONTROLLER_PROBE_SOURCE=actions_probe.m \
+  CONTROLLER_PROBE_OUTPUT=/tmp/controller-actions-probe \
+  python3 clients/native/ios/tests/build_probe.py
+python3.13 clients/native/ios/tests/test_actions_transport.py /tmp/controller-actions-probe
+python3.13 clients/native/ios/tests/test_actions_transport.py /tmp/controller-actions-probe denied-read
+python3.13 clients/native/ios/tests/test_actions_transport.py /tmp/controller-actions-probe bad-result
+python3.13 clients/native/ios/tests/test_actions_transport.py /tmp/controller-actions-probe lost-output
+python3.13 clients/native/ios/tests/test_actions_transport.py /tmp/controller-actions-probe runtime-error
+```
+
+With the bench S60 reachable, the native actions probe also checks five denied
+control commands under that mask and closes its session. With the phone ready,
+use TOUCH_ONLY=TouchTests/ConsoleTouchTests/testNamedActions to run just the named
+panel test. TOUCH_BUILD_ONLY=1 compiles/signs the suite without a connected phone;
+that is a build check, not an interaction pass. All runs need IOS_TEAM and a
+fresh TOUCH_RESULT; real runs also need IOS_DEVICE.
