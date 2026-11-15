@@ -13,6 +13,13 @@ extern controller_history_begin(handle: int) -> int
 extern controller_history_end(handle: int, follow: int)
 extern controller_console_cancel()
 extern controller_console_reset()
+extern controller_console_tick()
+extern controller_console_state() -> ptr
+extern controller_console_state_length() -> int
+extern controller_console_clear()
+extern controller_console_recall(direction: int, source: string)
+extern controller_console_recalled() -> ptr
+extern controller_console_recalled_length() -> int
 var shown_revision = -1
 var shown_console_revision = -1
 extern controller_check_status()
@@ -31,11 +38,12 @@ main() {
     auto_rc = 0
     auto_result = 0
     output_scroll = 0
+    session_state = 0
     ui.window("Device controller", 390, 700) {
         page = ui.scrollview() {
         ui.vstack(10) {
             ui.margin(12, 12, 12, 12)
-            ui.text("Device Console · b014")
+            ui.text("Device Console · b017")
             ui.divider()
             status = ui.text("Tap Check plug status to connect")
             ui.text_lines(status, 3)
@@ -43,10 +51,26 @@ main() {
             ui.btn("Import local credential") callback { controller_import_credential() }
             ui.btn("Check plug status") callback { controller_check_status() }
             ui.text("Read-only Rexx console")
+            session_state = ui.text("No session · Run opens one")
+            ui.text_lines(session_state, 2)
+            ui.set_height(session_state, 44)
             command = ui.textarea("Rexx command") callback { }
             ui.set_height(command, 90)
             controller_command_editor(command)
             ui.textarea_set_text(command, "SAY 6 * 7")
+            ui.hstack(12) {
+                ui.btn("Previous") callback {
+                    controller_console_recall(-1, ui.textarea_get_text(command))
+                    recalled = bytes.string_from_ptr(controller_console_recalled(), controller_console_recalled_length())
+                    ui.textarea_set_text(command, recalled)
+                }
+                ui.btn("Clear command") callback { ui.textarea_set_text(command, "") }
+                ui.btn("Next") callback {
+                    controller_console_recall(1, ui.textarea_get_text(command))
+                    recalled = bytes.string_from_ptr(controller_console_recalled(), controller_console_recalled_length())
+                    ui.textarea_set_text(command, recalled)
+                }
+            }
             ui.hstack(12) {
                 auto_rc = ui.toggle("Show RC") callback |active: int| { }
                 ui.text("Show RC")
@@ -67,6 +91,10 @@ main() {
                 transcript = ui.text_wrapped("Enter a command, then tap Run.", 0)
             }
             ui.set_height(output_scroll, 220)
+            ui.hstack(12) {
+                ui.btn("Clear output") callback { controller_console_clear() }
+                ui.btn("Jump to latest") callback { controller_history_end(output_scroll, 2) }
+            }
             ui.text("Credentials stay in this phone's Keychain.")
         }
         }
@@ -75,6 +103,7 @@ main() {
         ui.timer_once(800) callback { controller_probe_if_requested() }
         // Only public status text crosses this boundary.
         ui.timer(250) callback {
+            controller_console_tick()
             revision = controller_status_revision()
             if revision != shown_revision {
                 value = bytes.string_from_ptr(controller_status_text(), controller_status_length())
@@ -87,6 +116,8 @@ main() {
                 follow = controller_history_begin(output_scroll)
                 _history = ui.set_text(transcript, text)
                 controller_history_end(output_scroll, follow)
+                state_text = bytes.string_from_ptr(controller_console_state(), controller_console_state_length())
+                _session = ui.set_text(session_state, state_text)
                 shown_console_revision = console_revision
             }
         }

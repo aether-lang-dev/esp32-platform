@@ -17,3 +17,13 @@ void ControllerHistoryFollow(UIScrollView *scroll, BOOL follow) {
     [scroll layoutIfNeeded];
     [scroll setContentOffset:CGPointMake(scroll.contentOffset.x,bottom(scroll)) animated:NO];
 }
+
+void ControllerHistoryReveal(UIScrollView *scroll) {
+    for (UIView *parent=scroll.superview; parent; parent=parent.superview) {
+        if ([parent isKindOfClass:[UIScrollView class]]) {
+            [parent layoutIfNeeded];
+            [(UIScrollView *)parent scrollRectToVisible:[scroll convertRect:scroll.bounds toView:parent] animated:NO];
+            return;
+        }
+    }
+}

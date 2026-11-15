@@ -96,7 +96,7 @@ static ControllerConsole *ownerConsole(void) {
     console.changed=^{
         consoleDisplay=console.text; consoleRevision++;
         NSURL *cache=[[[NSFileManager defaultManager] URLsForDirectory:NSCachesDirectory inDomains:NSUserDomainMask] firstObject];
-        [[NSJSONSerialization dataWithJSONObject:@{@"transcript":consoleDisplay,@"busy":@(console.busy)} options:0 error:nil] writeToURL:[cache URLByAppendingPathComponent:@"console-result.json"] atomically:YES];
+        [[NSJSONSerialization dataWithJSONObject:@{@"transcript":consoleDisplay,@"busy":@(console.busy),@"sessionState":console.sessionStatus} options:0 error:nil] writeToURL:[cache URLByAppendingPathComponent:@"console-result.json"] atomically:YES];
     };
     return console;
 }
@@ -128,6 +128,10 @@ void controller_command_editor(int handle) {
     editor.autocapitalizationType=UITextAutocapitalizationTypeNone;
     editor.smartQuotesType=UITextSmartQuotesTypeNo;
     editor.smartDashesType=UITextSmartDashesTypeNo;
+    UIToolbar *toolbar=[[UIToolbar alloc] initWithFrame:CGRectMake(0,0,320,44)];
+    toolbar.items=@[[[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemFlexibleSpace target:nil action:nil],
+        [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemDone target:editor action:@selector(resignFirstResponder)]];
+    editor.inputAccessoryView=toolbar;
 }
 
 // Explicit development-only geometry report: no credential fields or handles.
@@ -151,11 +155,30 @@ static void layoutProbe(void) {
 int controller_history_begin(int handle) {
     UIScrollView *scroll=(__bridge UIScrollView *)aether_ui_get_widget(handle);
     if (![scroll isKindOfClass:[UIScrollView class]]) return 0;
-    BOOL follow=historyFollowRequested || ControllerHistoryAtBottom(scroll);
+    int follow=historyFollowRequested ? 2 : (ControllerHistoryAtBottom(scroll) ? 1 : 0);
     historyFollowRequested=NO;
     return follow;
 }
 void controller_history_end(int handle,int follow) {
     UIScrollView *scroll=(__bridge UIScrollView *)aether_ui_get_widget(handle);
-    if ([scroll isKindOfClass:[UIScrollView class]]) ControllerHistoryFollow(scroll,follow!=0);
+    if ([scroll isKindOfClass:[UIScrollView class]]) {
+        ControllerHistoryFollow(scroll,follow!=0);
+        if (follow==2) ControllerHistoryReveal(scroll);
+    }
 }
+
+void controller_console_tick(void) { [console keepAliveIfDue:NSProcessInfo.processInfo.systemUptime]; }
+const char *controller_console_state(void) { return (console ? console.sessionStatus : @"No session · Run opens one").UTF8String; }
+int controller_console_state_length(void) { return (int)[(console ? console.sessionStatus : @"No session · Run opens one") lengthOfBytesUsingEncoding:NSUTF8StringEncoding]; }
+void controller_console_clear(void) {
+    if (console) [console clearOutput];
+    else { consoleDisplay=@""; consoleRevision++; }
+}
+static NSString *recalled=@"";
+void controller_console_recall(int direction,const char *source) {
+    NSString *draft=[NSString stringWithUTF8String:source] ?: @"";
+    ControllerConsole *owner=ownerConsole();
+    recalled=owner ? (direction<0 ? [owner previousCommand:draft] : [owner nextCommand:draft]) : draft;
+}
+const char *controller_console_recalled(void) { return recalled.UTF8String; }
+int controller_console_recalled_length(void) { return (int)[recalled lengthOfBytesUsingEncoding:NSUTF8StringEncoding]; }

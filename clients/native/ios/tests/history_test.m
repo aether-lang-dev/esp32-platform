@@ -42,6 +42,12 @@ int main(void) {
         height.constant=1000;
         ControllerHistoryFollow(laidOut,pinned);
         require(fabs(laidOut.contentOffset.y-780)<1,"resolve new content height before following");
+        UIScrollView *page=[[UIScrollView alloc] initWithFrame:CGRectMake(0,0,361,700)];
+        page.contentSize=CGSizeMake(361,1200);
+        UIScrollView *output=[[UIScrollView alloc] initWithFrame:CGRectMake(12,900,337,220)];
+        [page addSubview:output];
+        ControllerHistoryReveal(output);
+        require(fabs(page.contentOffset.y-420)<1,"explicit Run reveals output below the page fold");
         puts("History append-follow, scrollback preservation, explicit follow and bounds PASS");
     }
     return 0;

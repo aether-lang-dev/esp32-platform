@@ -109,8 +109,9 @@ Reset closes the console session; the next Run starts with fresh variables.
 Cancel and wait for a running command before Reset. The firmware has one REPL
 session across controllers and expires it after120seconds without requests.
 Closing the phone process loses its volatile session handle; let that session
-expire before opening another controller. No automatic request retry or session
-replacement is attempted. Credentials remain in the local-only Keychain.
+expire before opening another controller. Commands are never automatically
+retried and sessions are never silently replaced. Read-only idle refreshes may
+retry as described below. Credentials remain in the local-only Keychain.
 
 ### Console verification
 
@@ -165,7 +166,7 @@ IOS_TEAM=your-team IOS_DEVICE=your-device \
   python3 clients/native/ios/tests/touch/run.py
 ```
 
-The runner is bounded to180seconds and requires a fresh TOUCH_RESULT path if
+The runner is bounded to300seconds and requires a fresh TOUCH_RESULT path if
 re-running with an existing xcresult. Its initial run could not enable iOS
 automation mode. The b014 retry on2026-11-15 passed on the physical iPhone:
 Status and Run updated results,42 appeared, both switches toggled, and Cancel
@@ -184,3 +185,46 @@ Auto Layout content height:
 ```
 sh clients/native/ios/tests/check_history.sh
 ```
+
+
+## Everyday console (b017)
+
+The foreground console sends an idle events read every20seconds to keep the
+device's120second session lease alive while you read or type. Running commands
+already refresh their lease through output polling. Only one idle read is in
+flight; a newer command/reset invalidates its late callback. Transient idle
+transport failures retain the handle and retry after5seconds, with a visible
+reconnecting status. Confirmed expiry or unexpected session state requires an
+explicit Reset; no command is replayed and no fresh session is silently opened.
+This is foreground keepalive: iOS suspension or terminating the app can still
+expire the lease. The failure reason remains in session status even if output
+is cleared. Public diagnostics include that status without exposing handles.
+
+Clear output changes only the transcript. Jump to latest returns to the bottom
+and reveals the output area in the page. Run also reveals new output; manual
+scrollback remains undisturbed by ordinary streamed updates. Previous/Next recall
+the last20 raw commands from RAM, with an unsent draft restored at the newest
+position. Consecutive duplicate commands are folded. Clear command empties the
+editor; the code keyboard includes a Done control. None of these controls adds
+relay or app-management grants, persists command history or changes the signed app.
+
+Verification on2026-11-15:
+
+- Native tests cover keepalive timing, duplicate idle reads, a stale-expiry race
+  against a new command, transient read recovery, explicit expiry, failure
+  visibility after Clear, recall and draft restoration. Disabling the heartbeat
+  in a scratch mutation makes the regression test fail.
+- UIKit tests cover following, preserving scrollback, explicit reveal when output
+  is below the page fold, bounds/insets and changing Auto Layout content height.
+- The independent TLS console lifecycle and all three malformed/stale negative
+  cases pass against the rebuilt native adapter.
+- The physical iPhone XCTest passed the complete everyday flow: typed answer=41,
+  stayed idle125seconds, then returned42 from SAY answer+1; Clear, Jump,
+  Previous/Next/draft restoration, cooperative cancellation, Reset and an unset
+  ANSWER variable after reset all passed. No relay operation was permitted.
+
+The real-device suite defaults to125seconds idle. Set CONSOLE_IDLE_SECONDS to a
+smaller value for a quick UI smoke run; that does not prove lease retention past
+the firmware's idle limit. The runner activates an already-running app when
+possible, avoiding the intermittent cold-launch control connection failure seen
+with this Xcode/iOS combination. Use a fresh TOUCH_RESULT output path per run.

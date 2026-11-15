@@ -31,3 +31,8 @@ The native lifecycle probe passed against the actual S60; the iPhone returned42
 and the v6 ADDRESS APPS status over TLS. See ios/README.md for tests and limits.
 Read ../../docs/REPOSITORY.md for the boundary and ../core/README.md for shared
 logic. Working browser UI remains at ../web/.
+
+Current phone build b017 adds foreground session keepalive/status, Clear output,
+Jump to latest, Previous/Next command recall with draft restoration, and a Done
+control on the code keyboard. The full physical-phone XCTest passed, including
+retaining a variable through125seconds idle, typing, cancellation and reset.
