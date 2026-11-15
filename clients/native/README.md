@@ -24,6 +24,10 @@ under ios/. Use the toolkit's existing backend ABI and build conventions.
 Do not vendor or fork the toolkit just to package this app. The firmware
 AETHER_REF does not automatically select a compatible native UI toolchain.
 
-Next: add the read-only Rexx console operation.
+Build b011 adds a separately owned Rexx console: command entry, bounded output
+history, RC/RESULT switches, Cancel and Reset session. Its grant mask1027 permits
+timers and ADDRESS APPS LIST/STATUS, without relay or app-management authority.
+The native lifecycle probe passed against the actual S60; the iPhone returned42
+and the v6 ADDRESS APPS status over TLS. See ios/README.md for tests and limits.
 Read ../../docs/REPOSITORY.md for the boundary and ../core/README.md for shared
 logic. Working browser UI remains at ../web/.

@@ -22,6 +22,6 @@ with tempfile.TemporaryDirectory() as directory:
     subprocess.run(["clang", "-O1", "-fobjc-arc", "-fblocks", *flags,
                     "-I"+str(scratch), "-I"+str(source), str(scratch/"ControllerTLS.c"),
                     str(source/"ControllerCredential.m"), str(source/"ControllerTransport.m"),
-                    str(source/"tests/transport_probe.m"), "-framework", "Foundation", "-framework", "Security",
+                    str(source/"ControllerConsole.m"), str(source/"tests"/os.environ.get("CONTROLLER_PROBE_SOURCE", "transport_probe.m")), "-framework", "Foundation", "-framework", "Security",
                     "-o", str(output)], check=True)
 print("Built native probe:", output)

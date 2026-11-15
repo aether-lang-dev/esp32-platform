@@ -1,10 +1,12 @@
 #import "ControllerTransport.h"
+#import "ControllerConsole.h"
 #import <Security/Security.h>
 #import <UIKit/UIKit.h>
 static NSString *display = @"No owner credential imported";
 static BOOL busy;
 static NSUInteger checks;
 static int revision;
+static void consoleProbe(void);
 static void publish(NSString *text) {
     display = text;
     revision++;
@@ -70,5 +72,55 @@ void controller_probe_if_requested(void) {
     if (getenv("CONTROLLER_PROBE_AUTORUN")) {
         controller_import_credential();
         controller_check_status();
+        if (getenv("CONTROLLER_CONSOLE_PROBE")) consoleProbe();
     }
+}
+
+static ControllerConsole *console;
+static NSString *consoleDisplay=@"Enter a command, then tap Run.";
+static int consoleRevision;
+static ControllerConsole *ownerConsole(void) {
+    if (console) return console;
+    NSMutableDictionary *query=[keyQuery() mutableCopy];
+    query[(__bridge id)kSecReturnData]=@YES;
+    CFTypeRef value=NULL;
+    if (SecItemCopyMatching((__bridge CFDictionaryRef)query,&value)!=errSecSuccess) return nil;
+    NSData *raw=CFBridgingRelease(value);
+    NSDictionary *credential=[NSJSONSerialization JSONObjectWithData:raw options:0 error:nil];
+    if (!ControllerCredentialValid(credential)) return nil;
+    console=[[ControllerConsole alloc] initWithCredential:credential];
+    console.changed=^{
+        consoleDisplay=console.text; consoleRevision++;
+        NSURL *cache=[[[NSFileManager defaultManager] URLsForDirectory:NSCachesDirectory inDomains:NSUserDomainMask] firstObject];
+        [[NSJSONSerialization dataWithJSONObject:@{@"transcript":consoleDisplay,@"busy":@(console.busy)} options:0 error:nil] writeToURL:[cache URLByAppendingPathComponent:@"console-result.json"] atomically:YES];
+    };
+    return console;
+}
+const char *controller_console_text(void) { return consoleDisplay.UTF8String; }
+int controller_console_length(void) { return (int)[consoleDisplay lengthOfBytesUsingEncoding:NSUTF8StringEncoding]; }
+int controller_console_revision(void) { return consoleRevision; }
+void controller_console_run(const char *source,int rc,int result) {
+    for (UIScene *scene in UIApplication.sharedApplication.connectedScenes)
+        if ([scene isKindOfClass:[UIWindowScene class]])
+            for (UIWindow *window in ((UIWindowScene *)scene).windows) [window endEditing:YES];
+    ControllerConsole *owner=ownerConsole();
+    if (!owner) { consoleDisplay=@"Import an owner credential first."; consoleRevision++; return; }
+    [owner run:[NSString stringWithUTF8String:source] ?: @"" showRC:rc!=0 showResult:result!=0];
+}
+void controller_console_cancel(void) { [ownerConsole() cancel]; }
+void controller_console_reset(void) { [ownerConsole() reset]; }
+
+static void consoleProbe(void) {
+    controller_console_run("x = 41\nSAY x + 1\nADDRESS APPS 'STATUS main'\nSAY RESULT",1,1);
+}
+
+extern void *aether_ui_get_widget(int handle);
+void controller_command_editor(int handle) {
+    UIView *view=(__bridge UIView *)aether_ui_get_widget(handle);
+    if (![view isKindOfClass:[UITextView class]]) return;
+    UITextView *editor=(UITextView *)view;
+    editor.autocorrectionType=UITextAutocorrectionTypeNo;
+    editor.autocapitalizationType=UITextAutocapitalizationTypeNone;
+    editor.smartQuotesType=UITextSmartQuotesTypeNo;
+    editor.smartDashesType=UITextSmartDashesTypeNo;
 }

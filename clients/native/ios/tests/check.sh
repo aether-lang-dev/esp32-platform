@@ -7,3 +7,7 @@ clang -fobjc-arc -fblocks -Wall -Wextra -Werror -I"$HERE/.." \
     "$HERE/../ControllerCredential.m" "$HERE/credential_test.m" \
     -framework Foundation -framework Network -framework Security -o "$SCRATCH/test"
 "$SCRATCH/test"
+clang -fobjc-arc -fblocks -Wall -Wextra -Werror -I"$HERE/.." \
+    "$HERE/../ControllerConsole.m" "$HERE/console_bounds_test.m" \
+    -framework Foundation -o "$SCRATCH/console-test"
+"$SCRATCH/console-test"

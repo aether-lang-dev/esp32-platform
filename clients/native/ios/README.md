@@ -53,7 +53,7 @@ fallback. The API generates fresh ephemeral entropy and handles P256 HRR.
 
 The native request has a ten-second absolute deadline. A duplicate socket
 reference permits cancellation without touching a reused descriptor. Requests
-are read-only GET/status, with at most16records/16384bytes, a required bounded
+use GET/status or fixed REPL routes, with at most16records/16384bytes, a required bounded
 Content-Length, no chunked framing and no redirects. Native JSON validation
 checks the status shape before displaying it.
 
@@ -80,3 +80,64 @@ reported app v6 / replay floor6. The owner credential was imported into the
 local-only Keychain after the synthetic proof. No relay command was sent. See asks/apple-external-psk-tls13.md for the original
 Apple-provider finding and current validation status. QR enrollment and
 per-phone public-key authentication remain separate work.
+
+
+## Rexx console (b011)
+
+The Aether UI supplies multiline command entry, Run, Cancel and Reset session,
+plus independent Show RC and Show RESULT switches. The switches append SAY
+statements to the submitted source; they are not a debugger and do not run after
+a syntax error or an early EXIT. Output history is bounded to32000UTF-16 units
+and trimmed with a visible marker. Code input disables smart quotes, smart
+dashes, autocapitalization and autocorrection; Run dismisses the keyboard.
+
+ControllerConsole owns its own device REPL session and variables. It does not
+replace, restart or change the installed signed app. The initial grant mask1027
+permits timers and read-only ADDRESS APPS LIST/STATUS. SWITCH, OUTLET control,
+APPS RUN and APPS CALL are denied. This console is not yet a relay remote.
+
+Commands are capped at8192UTF-8 bytes including automatic RC/RESULT statements.
+Native code constructs fixed routes and session/sequence headers; source goes
+only in the length-delimited body. Command sequence increases across the session;
+the event cursor resets for each command. A pending Run cannot be submitted twice.
+Events are polled, checked against that command and decoded from hex. Malformed
+or stale replies stop observation without replaying a command. A transport error
+leaves the outcome uncertain: reset before submitting again.
+
+Cancel requests cooperative cancellation through the existing host endpoint.
+Reset closes the console session; the next Run starts with fresh variables.
+Cancel and wait for a running command before Reset. The firmware has one REPL
+session across controllers and expires it after120seconds without requests.
+Closing the phone process loses its volatile session handle; let that session
+expire before opening another controller. No automatic request retry or session
+replacement is attempted. Credentials remain in the local-only Keychain.
+
+### Console verification
+
+```
+clients/native/ios/tests/check.sh
+AETHER_TLS_DIR=/path/to/tested/aether CONTROLLER_PROBE_SOURCE=console_probe.m \
+  CONTROLLER_PROBE_OUTPUT=/tmp/controller-console-probe \
+  python3 clients/native/ios/tests/build_probe.py
+python3.13 clients/native/ios/tests/test_console_transport.py /tmp/controller-console-probe
+python3.13 clients/native/ios/tests/test_console_transport.py /tmp/controller-console-probe bad-hex
+python3.13 clients/native/ios/tests/test_console_transport.py /tmp/controller-console-probe stale-sequence
+python3.13 clients/native/ios/tests/test_console_transport.py /tmp/controller-console-probe bad-schema
+```
+
+The strict cursor fixture was proven to fail the previous native client. Native
+bounds tests check empty/NUL/oversized UTF-8 source and repeated Run taps. The
+independent TLS peer checks routes, grants, sequence/cursor handling, RC/RESULT
+switches, cancellation and reset. Negative peers must fail without command replay.
+The existing seven TLS/framing/deadline tests also pass.
+
+On2026-11-15, the Mac adapter against the real S60 proved retained variables
+(x=41, then42), ADDRESS APPS main status(v6/floor6), streaming and cancellation,
+relay denial(RC13), syntax-error recovery and variable clearing on reset. The
+signed iPhone b011 separately returned42, the v6/floor6 ADDRESS APPS reply,
+RC0 and RESULT, exit0. Firmware and signed app remained unchanged.
+
+CONTROLLER_CONSOLE_PROBE=1 alongside CONTROLLER_PROBE_AUTORUN=1 enables the
+explicit developer-only harmless console proof on launch. Normal launches use
+the buttons. Public transcript diagnostics go to Caches/console-result.json;
+no credential values or session handles are included.
