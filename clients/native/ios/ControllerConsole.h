@@ -6,6 +6,7 @@
 @property(nonatomic,copy) void (^changed)(void);
 - (instancetype)initWithCredential:(NSDictionary *)credential;
 - (void)run:(NSString *)source showRC:(BOOL)rc showResult:(BOOL)result;
+- (void)runNamedSource:(NSString *)source completion:(void (^)(NSString *,NSString *))completion;
 - (void)keepAliveIfDue:(NSTimeInterval)now;
 - (void)clearOutput;
 - (NSString *)previousCommand:(NSString *)draft;

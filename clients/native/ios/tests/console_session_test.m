@@ -73,8 +73,14 @@ int main(void) {
                     require([console.sessionStatus containsString:@"session expired or replaced"],"Clear output retains failure reason");
                     [console reset];
                     require([console.sessionStatus containsString:@"No session"],"reset clears expired session state");
-                    puts("Session keepalive timing, in-flight race, expiry visibility, Clear and command recall PASS");
-                    exit(0);
+                    expireRead=NO;
+                    [console runNamedSource:@"SAY 42" completion:^(NSString *output,NSString *error){
+                        require(!error && [output isEqual:@"42\n"],"named capture contains only command output");
+                        require([[console previousCommand:@"draft"] isEqual:@"SAY answer + 1"],"named source does not enter typed-command recall");
+                        puts("Session keepalive timing, races, expiry, recall and isolated named output PASS");
+                        exit(0);
+                    }];
+                    break;
             }
         });
         dispatch_resume(timer);

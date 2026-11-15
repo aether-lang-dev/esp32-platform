@@ -17,10 +17,12 @@
 @property NSString *draft;
 @property NSString *refreshError;
 @property NSString *failureReason;
+@property(copy) void (^namedCompletion)(NSString *,NSString *);
+@property NSMutableString *namedOutput;
 @end
 @implementation ControllerConsole
 - (instancetype)initWithCredential:(NSDictionary *)credential {
-    if ((self=[super init])) { _credential=[credential copy]; _commands=[NSMutableArray array]; _draft=@""; _history=[NSMutableString stringWithString:@"Read-only console · timers and ADDRESS APPS STATUS/LIST\n"]; }
+    if ((self=[super init])) { _credential=[credential copy]; _commands=[NSMutableArray array]; _draft=@""; _history=[NSMutableString stringWithString:@"Read-only console · timers, app, relay and countdown status\n"]; }
     return self;
 }
 - (NSString *)text { return [self.history copy]; }
@@ -85,6 +87,20 @@
     self.busy=NO; self.uncertain=YES; self.failureReason=error;
     if ([error isEqual:@"session expired or replaced"]) { self.session=nil; self.sequence=self.cursor=0; }
     [self append:[NSString stringWithFormat:@"[%@ · reset session before retrying]\n",error]];
+    [self finishNamed:error];
+}
+- (void)finishNamed:(NSString *)error {
+    void (^completion)(NSString *,NSString *)=self.namedCompletion;
+    NSString *output=[self.namedOutput copy];
+    self.namedCompletion=nil; self.namedOutput=nil;
+    if (completion) completion(output,error);
+}
+- (void)runNamedSource:(NSString *)source completion:(void (^)(NSString *,NSString *))completion {
+    if (!completion) return;
+    if (self.busy || self.uncertain) { completion(nil,self.busy ? @"Console is busy" : @"Reset the console session first"); return; }
+    if (!source.length || [source lengthOfBytesUsingEncoding:NSUTF8StringEncoding]>8192 || [source rangeOfString:@"\0"].location!=NSNotFound) { completion(nil,@"Invalid action source"); return; }
+    self.namedCompletion=completion; self.namedOutput=[NSMutableString string];
+    [self run:source showRC:NO showResult:NO];
 }
 - (void)run:(NSString *)source showRC:(BOOL)rc showResult:(BOOL)result {
     if (self.busy) { [self append:@"[command already running]\n"]; return; }
@@ -95,11 +111,11 @@
     if (!source.length || [submitted lengthOfBytesUsingEncoding:NSUTF8StringEncoding]>8192 || [source rangeOfString:@"\0"].location!=NSNotFound) { [self append:@"[command must be 1–8192 UTF-8 bytes without NUL]\n"]; return; }
     // A new command supersedes any harmless idle read already in flight.
     self.generation++; self.maintenanceInFlight=NO; self.refreshError=nil;
-    if (![self.commands.lastObject isEqual:source]) {
+    if (!self.namedCompletion && ![self.commands.lastObject isEqual:source]) {
         [self.commands addObject:[source copy]];
         if (self.commands.count>20) [self.commands removeObjectAtIndex:0];
     }
-    self.historyIndex=self.commands.count; self.draft=@"";
+    if (!self.namedCompletion) { self.historyIndex=self.commands.count; self.draft=@""; }
     self.busy=YES;
     [self append:[NSString stringWithFormat:@"rexx> %@\n",source]];
     void (^submit)(void)=^{
@@ -141,11 +157,16 @@
             if ([event[@"end"] boolValue]) [output appendString:@"\n"];
         }
         self.cursor=[body[@"cursor"] unsignedIntegerValue];
+        if (self.namedCompletion) {
+            if ([body[@"lost"] boolValue] || self.namedOutput.length+output.length>16384) { [self fail:@"Named action output lost or too large"]; return; }
+            [self.namedOutput appendString:output];
+        }
         if (output.length) [self append:output];
         if ([body[@"state"] isEqual:@"done"]) {
             self.busy=NO;
             self.nextKeepAlive=NSProcessInfo.processInfo.systemUptime+20;
             [self append:[NSString stringWithFormat:@"[exit %@%@]\n",body[@"exitCode"] ?: @"?",[body[@"cancelled"] boolValue] ? @" · cancelled" : @""]];
+            [self finishNamed:([body[@"exitCode"] intValue] || [body[@"runtimeOutcome"] intValue] || [body[@"cancelled"] boolValue]) ? @"Named action did not complete successfully" : nil];
             return;
         }
         if (![body[@"state"] isEqual:@"running"] && ![body[@"state"] isEqual:@"pending"]) { [self fail:@"Unexpected console state"]; return; }

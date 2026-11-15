@@ -15,3 +15,12 @@ clang -fobjc-arc -fblocks -Wall -Wextra -Werror -I"$HERE/.." \
     "$HERE/../ControllerConsole.m" "$HERE/console_session_test.m" \
     -framework Foundation -o "$SCRATCH/session-test"
 "$SCRATCH/session-test"
+clang -fobjc-arc -fblocks -Wall -Wextra -Werror -I"$HERE/.." \
+    "$HERE/../ControllerActions.m" "$HERE/actions_test.m" \
+    -framework Foundation -o "$SCRATCH/actions-test"
+"$SCRATCH/actions-test"
+FIRMWARE="$HERE/../../../../firmware/esp-idf/main"
+clang -Wall -Wextra -Werror -I"$FIRMWARE" \
+    "$FIRMWARE/runner_outlet.c" "$FIRMWARE/runner_switch.c" "$FIRMWARE/runner_apps.c" \
+    "$HERE/named_grants_test.c" -o "$SCRATCH/grants-test"
+"$SCRATCH/grants-test"
