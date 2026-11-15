@@ -1,9 +1,10 @@
 # Native controller
 
-app.ae is the Aether UI entry point. It is an unconnected UI shell: it neither
-controls devices nor stores keys yet. Prefer this interface for the iPhone app
-rather than rewriting the UI in Swift. The sibling aether-ui project already
-has a UIKit backend and simulator compile/link/run coverage in ci.sh Phase1e2.
+app.ae is the Aether UI entry point. The development iPhone bundle now has
+native Keychain import and a bounded status transport adapter; it is signed
+and installed, but the real TLS1.3-PSK connection is not yet proven. The phone
+must be unlocked for launch, and the native TLS interoperability gap is
+recorded under asks/apple-external-psk-tls13.md. No real plug key was imported.
 
 Check the portable source against that dependency:
 
@@ -22,7 +23,7 @@ under ios/. Use the toolkit's existing backend ABI and build conventions.
 Do not vendor or fork the toolkit just to package this app. The firmware
 AETHER_REF does not automatically select a compatible native UI toolchain.
 
-Next: prove native TLS-PSK with the device's status operation using synthetic
-QEMU credentials, then add local-only key storage and the real device console.
+Next: finish the native TLS1.3-PSK proof using synthetic credentials, then
+exercise the real device console.
 Read ../../docs/REPOSITORY.md for the boundary and ../core/README.md for shared
 logic. Working browser UI remains at ../web/.

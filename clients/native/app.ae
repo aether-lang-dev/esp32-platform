@@ -1,14 +1,27 @@
-// Aether UI entry point shared by desktop and the future UIKit app bundle.
-// No transport or credential storage is connected in this initial shell.
+// Portable Aether UI, with secrets and network operations behind native handles.
 import ui
+import std.string
+extern controller_status_text() -> ptr
+extern controller_check_status()
+extern controller_import_credential()
+extern controller_probe_if_requested()
 
 main() {
+    status = 0
     ui.window("Device controller", 390, 700) {
         ui.vstack(16) {
             ui.text("Device console")
             ui.divider()
-            ui.text("No devices enrolled")
-            ui.text("Use your owner app to approve this phone.")
+            status = ui.text("No owner credential imported")
+            ui.btn("Import local credential") callback { controller_import_credential() }
+            ui.btn("Check plug status") callback { controller_check_status() }
+            ui.text("Credentials stay in this phone's Keychain.")
+        }
+        ui.timer_once(800) callback { controller_probe_if_requested() }
+        // Only public status text crosses this boundary.
+        ui.timer(250) callback {
+            value, err = string.from_ptr(controller_status_text())
+            if err == "" { _updated = ui.set_text(status, value) }
         }
     }
 }
