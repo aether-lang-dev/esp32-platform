@@ -32,7 +32,7 @@ main() {
         page = ui.scrollview() {
         ui.vstack(10) {
             ui.margin(12, 12, 12, 12)
-            ui.text("Device Console · b012")
+            ui.text("Device Console · b013")
             ui.divider()
             status = ui.text("Tap Check plug status to connect")
             ui.text_lines(status, 3)

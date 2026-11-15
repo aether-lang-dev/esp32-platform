@@ -150,3 +150,21 @@ fix and passes after it, including resize and replacement. The initial status
 now invites a status check instead of claiming the credential is missing.
 CONTROLLER_LAYOUT_PROBE=1 enables a public geometry report in Caches/console-layout.json
 for physical-device verification; it does not contain credentials.
+
+Build b013 starts UIKit before building gesture-bearing views. The prior
+b011/b012 startup order raised a UIKit exception on physical taps inside scroll
+containers, before any command callback. The local toolkit fix adds an entry
+shim and constructs the Aether UI from didFinishLaunching. The iPhone returned42
+and v6 app status, and Paul confirmed Check plug status and Run stay open and
+update their results. Details: asks/ios-scroll-touch-startup.md at repo root.
+
+A reusable real-touch test targets the already-installed app:
+
+```
+IOS_TEAM=your-team IOS_DEVICE=your-device \
+  python3 clients/native/ios/tests/touch/run.py
+```
+
+The runner is bounded to180seconds and requires a fresh TOUCH_RESULT path if
+re-running with an existing xcresult. On this phone it compiled/signed but
+could not enable iOS automation mode, so the physical tap proof is manual.
