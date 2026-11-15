@@ -11,3 +11,7 @@ clang -fobjc-arc -fblocks -Wall -Wextra -Werror -I"$HERE/.." \
     "$HERE/../ControllerConsole.m" "$HERE/console_bounds_test.m" \
     -framework Foundation -o "$SCRATCH/console-test"
 "$SCRATCH/console-test"
+clang -fobjc-arc -fblocks -Wall -Wextra -Werror -I"$HERE/.." \
+    "$HERE/../ControllerConsole.m" "$HERE/console_session_test.m" \
+    -framework Foundation -o "$SCRATCH/session-test"
+"$SCRATCH/session-test"

@@ -10,13 +10,63 @@
 @property NSUInteger generation;
 @property NSUInteger polls;
 @property BOOL uncertain;
+@property BOOL maintenanceInFlight;
+@property NSTimeInterval nextKeepAlive;
+@property NSMutableArray<NSString *> *commands;
+@property NSUInteger historyIndex;
+@property NSString *draft;
+@property NSString *refreshError;
+@property NSString *failureReason;
 @end
 @implementation ControllerConsole
 - (instancetype)initWithCredential:(NSDictionary *)credential {
-    if ((self=[super init])) { _credential=[credential copy]; _history=[NSMutableString stringWithString:@"Read-only console · timers and ADDRESS APPS STATUS/LIST\n"]; }
+    if ((self=[super init])) { _credential=[credential copy]; _commands=[NSMutableArray array]; _draft=@""; _history=[NSMutableString stringWithString:@"Read-only console · timers and ADDRESS APPS STATUS/LIST\n"]; }
     return self;
 }
 - (NSString *)text { return [self.history copy]; }
+- (NSString *)sessionStatus {
+    if (self.uncertain) return [NSString stringWithFormat:@"Session needs attention · %@ · reset before retrying",self.failureReason ?: @"unknown outcome"];
+    if (self.busy) return @"Session busy";
+    if (self.refreshError) return [NSString stringWithFormat:@"Session reconnecting · %@",self.refreshError];
+    if (self.session) return @"Session ready · variables retained · keepalive on";
+    return @"No session · Run opens one";
+}
+- (void)clearOutput { [self.history setString:@""]; if (self.changed) self.changed(); }
+- (NSString *)previousCommand:(NSString *)draft {
+    if (!self.commands.count) return draft;
+    if (self.historyIndex==self.commands.count) self.draft=[draft copy];
+    if (self.historyIndex>0) self.historyIndex--;
+    return self.commands[self.historyIndex];
+}
+- (NSString *)nextCommand:(NSString *)draft {
+    if (self.historyIndex>=self.commands.count) return draft;
+    self.historyIndex++;
+    return self.historyIndex==self.commands.count ? self.draft : self.commands[self.historyIndex];
+}
+- (void)keepAliveIfDue:(NSTimeInterval)now {
+    if (!self.session || self.busy || self.uncertain || self.maintenanceInFlight || now<self.nextKeepAlive) return;
+    self.maintenanceInFlight=YES;
+    [self request:@"events" sequence:self.cursor source:@"" reply:^(NSDictionary *body,NSString *error){
+        self.maintenanceInFlight=NO;
+        if (error) {
+            if ([error isEqual:@"session expired or replaced"]) { [self fail:error]; return; }
+            // A failed idle read has no command outcome to make uncertain.
+            // Keep the handle and retry soon; never silently reopen a session.
+            self.refreshError=error;
+            self.nextKeepAlive=NSProcessInfo.processInfo.systemUptime+5;
+            if (self.changed) self.changed();
+            return;
+        }
+        if (![body[@"sequence"] isKindOfClass:[NSNumber class]] || [body[@"sequence"] unsignedIntegerValue]!=self.sequence ||
+            ![body[@"state"] isEqual:@"done"] || ![body[@"cursor"] isKindOfClass:[NSNumber class]] || [body[@"cursor"] unsignedIntegerValue]!=self.cursor) {
+            [self fail:@"Session refresh returned unexpected state"]; return;
+        }
+        BOOL recovered=self.refreshError!=nil;
+        self.refreshError=nil;
+        self.nextKeepAlive=NSProcessInfo.processInfo.systemUptime+20;
+        if (recovered && self.changed) self.changed();
+    }];
+}
 - (void)append:(NSString *)text {
     [self.history appendString:text];
     if (self.history.length>32000) {
@@ -32,7 +82,7 @@
     });
 }
 - (void)fail:(NSString *)error {
-    self.busy=NO; self.uncertain=YES;
+    self.busy=NO; self.uncertain=YES; self.failureReason=error;
     if ([error isEqual:@"session expired or replaced"]) { self.session=nil; self.sequence=self.cursor=0; }
     [self append:[NSString stringWithFormat:@"[%@ · reset session before retrying]\n",error]];
 }
@@ -43,6 +93,13 @@
     if (rc) [submitted appendString:@"\nSAY 'RC =' RC"];
     if (result) [submitted appendString:@"\nSAY 'RESULT =' RESULT"];
     if (!source.length || [submitted lengthOfBytesUsingEncoding:NSUTF8StringEncoding]>8192 || [source rangeOfString:@"\0"].location!=NSNotFound) { [self append:@"[command must be 1–8192 UTF-8 bytes without NUL]\n"]; return; }
+    // A new command supersedes any harmless idle read already in flight.
+    self.generation++; self.maintenanceInFlight=NO; self.refreshError=nil;
+    if (![self.commands.lastObject isEqual:source]) {
+        [self.commands addObject:[source copy]];
+        if (self.commands.count>20) [self.commands removeObjectAtIndex:0];
+    }
+    self.historyIndex=self.commands.count; self.draft=@"";
     self.busy=YES;
     [self append:[NSString stringWithFormat:@"rexx> %@\n",source]];
     void (^submit)(void)=^{
@@ -87,6 +144,7 @@
         if (output.length) [self append:output];
         if ([body[@"state"] isEqual:@"done"]) {
             self.busy=NO;
+            self.nextKeepAlive=NSProcessInfo.processInfo.systemUptime+20;
             [self append:[NSString stringWithFormat:@"[exit %@%@]\n",body[@"exitCode"] ?: @"?",[body[@"cancelled"] boolValue] ? @" · cancelled" : @""]];
             return;
         }
@@ -105,13 +163,14 @@
 }
 - (void)reset {
     if (self.busy) { [self append:@"[cancel and wait for completion before resetting]\n"]; return; }
-    if (!self.session) { self.uncertain=NO; self.sequence=self.cursor=0; self.generation++; [self append:@"[local session reset]\n"]; return; }
+    if (!self.session) { self.uncertain=NO; self.failureReason=nil; self.refreshError=nil; self.sequence=self.cursor=0; self.generation++; [self append:@"[local session reset]\n"]; return; }
+    self.generation++; self.maintenanceInFlight=NO;
     self.busy=YES;
     [self request:@"close" sequence:0 source:@"" reply:^(NSDictionary *body,NSString *error){
         (void)body;
         self.busy=NO;
         if (error && ![error isEqual:@"session expired or replaced"]) { [self fail:error]; return; }
-        self.session=nil; self.sequence=self.cursor=0; self.uncertain=NO; self.generation++;
+        self.session=nil; self.sequence=self.cursor=0; self.uncertain=NO; self.failureReason=nil; self.refreshError=nil; self.generation++;
         [self append:@"[session closed · variables cleared on next run]\n"];
     }];
 }
