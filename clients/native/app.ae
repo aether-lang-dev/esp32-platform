@@ -29,9 +29,10 @@ main() {
     auto_rc = 0
     auto_result = 0
     ui.window("Device controller", 390, 700) {
-        ui.scrollview() {
+        page = ui.scrollview() {
         ui.vstack(10) {
-            ui.text("Device Console · b011")
+            ui.margin(12, 12, 12, 12)
+            ui.text("Device Console · b012")
             ui.divider()
             status = ui.text("Tap Check plug status to connect")
             ui.text_lines(status, 3)
@@ -60,12 +61,14 @@ main() {
                 ui.btn("Reset session") callback { controller_console_reset() }
             }
             output_scroll = ui.scrollview() {
-                transcript = ui.text_wrapped("Enter a command, then tap Run.", 330)
+                transcript = ui.text_wrapped("Enter a command, then tap Run.", 0)
             }
             ui.set_height(output_scroll, 220)
             ui.text("Credentials stay in this phone's Keychain.")
         }
         }
+        ui.fill_width(page)
+        ui.fill_height(page)
         ui.timer_once(800) callback { controller_probe_if_requested() }
         // Only public status text crosses this boundary.
         ui.timer(250) callback {

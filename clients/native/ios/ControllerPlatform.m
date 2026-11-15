@@ -2,11 +2,12 @@
 #import "ControllerConsole.h"
 #import <Security/Security.h>
 #import <UIKit/UIKit.h>
-static NSString *display = @"No owner credential imported";
+static NSString *display = @"Ready · tap Check plug status";
 static BOOL busy;
 static NSUInteger checks;
 static int revision;
 static void consoleProbe(void);
+static void layoutProbe(void);
 static void publish(NSString *text) {
     display = text;
     revision++;
@@ -69,6 +70,7 @@ void controller_check_status(void) {
 }
 
 void controller_probe_if_requested(void) {
+    if (getenv("CONTROLLER_LAYOUT_PROBE")) dispatch_after(dispatch_time(DISPATCH_TIME_NOW,NSEC_PER_SEC),dispatch_get_main_queue(),^{ layoutProbe(); });
     if (getenv("CONTROLLER_PROBE_AUTORUN")) {
         controller_import_credential();
         controller_check_status();
@@ -123,4 +125,22 @@ void controller_command_editor(int handle) {
     editor.autocapitalizationType=UITextAutocapitalizationTypeNone;
     editor.smartQuotesType=UITextSmartQuotesTypeNo;
     editor.smartDashesType=UITextSmartDashesTypeNo;
+}
+
+// Explicit development-only geometry report: no credential fields or handles.
+static void layoutRows(UIView *view, UIWindow *window, NSMutableArray *rows) {
+    CGRect frame=[view convertRect:view.bounds toView:window];
+    NSMutableDictionary *row=[@{@"kind":NSStringFromClass(view.class),@"x":@(frame.origin.x),@"y":@(frame.origin.y),@"width":@(frame.size.width),@"height":@(frame.size.height)} mutableCopy];
+    if ([view isKindOfClass:[UILabel class]]) row[@"text"]=((UILabel *)view).text ?: @"";
+    if ([view isKindOfClass:[UIScrollView class]]) { row[@"contentWidth"]=@(((UIScrollView *)view).contentSize.width); row[@"contentHeight"]=@(((UIScrollView *)view).contentSize.height); }
+    [rows addObject:row];
+    for (UIView *child in view.subviews) layoutRows(child,window,rows);
+}
+static void layoutProbe(void) {
+    NSMutableArray *rows=[NSMutableArray array];
+    for (UIScene *scene in UIApplication.sharedApplication.connectedScenes)
+        if ([scene isKindOfClass:[UIWindowScene class]])
+            for (UIWindow *window in ((UIWindowScene *)scene).windows) layoutRows(window,window,rows);
+    NSURL *cache=[[[NSFileManager defaultManager] URLsForDirectory:NSCachesDirectory inDomains:NSUserDomainMask] firstObject];
+    [[NSJSONSerialization dataWithJSONObject:rows options:0 error:nil] writeToURL:[cache URLByAppendingPathComponent:@"console-layout.json"] atomically:YES];
 }

@@ -141,3 +141,12 @@ CONTROLLER_CONSOLE_PROBE=1 alongside CONTROLLER_PROBE_AUTORUN=1 enables the
 explicit developer-only harmless console proof on launch. Normal launches use
 the buttons. Public transcript diagnostics go to Caches/console-result.json;
 no credential values or session handles are included.
+
+Build b012 fixes the narrow console layout using UIKit content/frame layout
+guides in the local aether-ui checkout. The scroll container fills the phone
+viewport, history wraps to available width, and its content height drives
+vertical scrolling. The UIKit render/geometry probe fails before the toolkit
+fix and passes after it, including resize and replacement. The initial status
+now invites a status check instead of claiming the credential is missing.
+CONTROLLER_LAYOUT_PROBE=1 enables a public geometry report in Caches/console-layout.json
+for physical-device verification; it does not contain credentials.
