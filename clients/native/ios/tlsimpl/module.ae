@@ -3,7 +3,7 @@ import std.tcp
 import std.bytes
 import std.string
 import std.cryptography.tls13_client
-exports(request)
+exports(request, request_http)
 extern controller_tls_deadlines(sock: ptr) -> int
 
 fn refuse(why: string, error: byte[]) -> int {
@@ -16,6 +16,11 @@ fn refuse(why: string, error: byte[]) -> int {
 }
 
 request(host: string, port: int, identity: byte[], key: byte[], output: byte[], error: byte[]) -> int {
+    return request_http(host, port, identity, key, "GET /status HTTP/1.1\r\nHost: ${host}\r\nConnection: close\r\n\r\n", output, error)
+}
+
+request_http(host: string, port: int, identity: byte[], key: byte[], http: string, output: byte[], error: byte[]) -> int {
+    if string.length(http) < 1 || string.length(http) > 9216 { return refuse("Invalid request length", error) }
     if output.len < 1 || output.len > 16384 || error.len < 1 { return -1 }
     sock, dialerr = tcp.connect_timeout(host, port, 5000)
     if dialerr != "" { return refuse(dialerr, error) }
@@ -26,7 +31,6 @@ request(host: string, port: int, identity: byte[], key: byte[], output: byte[], 
     conn, tlserr = tls13_client.connect_socket_psk(sock, identity, key)
     if tlserr != "" { return refuse(tlserr, error) }
     defer tls13_client.close_conn(conn)
-    http = "GET /status HTTP/1.1\r\nHost: ${host}\r\nConnection: close\r\n\r\n"
     senderr = tls13_client.conn_send(conn, string.bytes(http))
     if senderr != "" { return refuse(senderr, error) }
     accumulated = ""
@@ -41,8 +45,11 @@ request(host: string, port: int, identity: byte[], key: byte[], output: byte[], 
         split = string.index_of(accumulated, "\r\n\r\n")
         if split >= 0 {
             header = string.substring(accumulated, 0, split)
-            if !string.starts_with(header, "HTTP/1.1 200 ") && !string.starts_with(header, "HTTP/1.0 200 ") {
-                return refuse("Device rejected status request", error)
+            if !string.starts_with(header, "HTTP/1.1 ") && !string.starts_with(header, "HTTP/1.0 ") { return refuse("Invalid HTTP response", error) }
+            if string.length(header) < 12 { return refuse("Invalid HTTP response", error) }
+            code, codeerr = string.to_int(string.substring(header, 9, 12))
+            if codeerr != "" || !((code >= 200 && code <= 299) || (code >= 400 && code <= 499)) {
+                return refuse("Device rejected request", error)
             }
             lower = string.to_lower(header)
             if string.index_of(lower, "\r\ntransfer-encoding:") >= 0 { return refuse("Unsupported response framing", error) }

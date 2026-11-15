@@ -50,7 +50,7 @@ int controller_tls_deadlines(void *socket) {
         setsockopt(fd,SOL_SOCKET,SO_SNDTIMEO,&interval,sizeof interval)!=0 ? -1 : 0;
 }
 
-void ControllerReadStatus(NSDictionary *credential, void (^completion)(NSDictionary *, NSString *)) {
+static void ControllerRequest(NSDictionary *credential, NSData *request, BOOL statusOnly, void (^completion)(NSDictionary *, NSString *)) {
     if (!ControllerCredentialValid(credential)) { completion(nil, @"Invalid native credential"); return; }
     NSString *host = credential[@"host"], *identity = credential[@"identity"], *hex = credential[@"key"];
     struct in_addr address;
@@ -71,8 +71,9 @@ void ControllerReadStatus(NSDictionary *credential, void (^completion)(NSDiction
         ControllerDeadline *deadline=[ControllerDeadline new];
         activeDeadline=(__bridge void *)deadline;
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW,10*NSEC_PER_SEC),dispatch_get_global_queue(QOS_CLASS_UTILITY,0), ^{ [deadline expire]; });
-        int count = aether_controller_tls_status(host.UTF8String, port,
+        int count = aether_controller_tls_request(host.UTF8String, port,
             (AetherValue *)name.bytes, (int)name.length, (AetherValue *)key.mutableBytes, 32,
+            (AetherValue *)request.bytes, (int)request.length,
             (AetherValue *)output.mutableBytes, (int)output.length, (AetherValue *)error.mutableBytes, (int)error.length);
         activeDeadline=NULL;
         BOOL expired=[deadline finish];
@@ -85,10 +86,38 @@ void ControllerReadStatus(NSDictionary *credential, void (^completion)(NSDiction
         }
         NSData *bodyData = [output subdataWithRange:NSMakeRange(0,(NSUInteger)count)];
         id body = [NSJSONSerialization JSONObjectWithData:bodyData options:0 error:nil];
-        if (![body isKindOfClass:[NSDictionary class]] || ![body[@"activeVersion"] isKindOfClass:[NSNumber class]] ||
-            ![body[@"highestVersion"] isKindOfClass:[NSNumber class]]) {
+        if ([body isKindOfClass:[NSDictionary class]] && [body[@"error"] isKindOfClass:[NSString class]]) { completion(nil,body[@"error"]); return; }
+        if (![body isKindOfClass:[NSDictionary class]] || (statusOnly && (![body[@"activeVersion"] isKindOfClass:[NSNumber class]] ||
+            ![body[@"highestVersion"] isKindOfClass:[NSNumber class]]))) {
             completion(nil, @"Invalid device status"); return;
         }
         completion(body,nil);
     });
+}
+
+void ControllerReadStatus(NSDictionary *credential, void (^completion)(NSDictionary *, NSString *)) {
+    if (!ControllerCredentialValid(credential)) { completion(nil,@"Invalid native credential"); return; }
+    NSString *http=[NSString stringWithFormat:@"GET /status HTTP/1.1\r\nHost: %@\r\nConnection: close\r\n\r\n",credential[@"host"]];
+    ControllerRequest(credential,[http dataUsingEncoding:NSUTF8StringEncoding],YES,completion);
+}
+void ControllerReplRequest(NSDictionary *credential, NSString *action, NSString *session,
+    NSUInteger sequence, NSString *source, void (^completion)(NSDictionary *, NSString *)) {
+    NSDictionary *routes=@{@"open":@"/repl/open",@"run":@"/repl/command",@"events":@"/repl/events",@"cancel":@"/repl/cancel",@"close":@"/repl/close"};
+    if (!ControllerCredentialValid(credential) || !routes[action] || sequence>UINT32_MAX) { completion(nil,@"Invalid console request"); return; }
+    BOOL open=[action isEqual:@"open"], events=[action isEqual:@"events"], run=[action isEqual:@"run"];
+    NSCharacterSet *bad=[[NSCharacterSet characterSetWithCharactersInString:@"0123456789abcdef"] invertedSet];
+    if (!open && (session.length!=32 || [session rangeOfCharacterFromSet:bad].location!=NSNotFound)) { completion(nil,@"Invalid console session"); return; }
+    // Console initially requests timers and read-only APPS access, no relay grants.
+    NSString *body=open ? @"1027" : (run ? source : @"");
+    NSData *data=[body dataUsingEncoding:NSUTF8StringEncoding];
+    if (!data || (run && (!data.length || data.length>8192 || [body rangeOfString:@"\0"].location!=NSNotFound))) { completion(nil,@"Command must be 1–8192 UTF-8 bytes without NUL"); return; }
+    NSMutableString *http=[NSMutableString stringWithFormat:@"%@ %@ HTTP/1.1\r\nHost: %@\r\nConnection: close\r\n",events ? @"GET" : @"POST",routes[action],credential[@"host"]];
+    if (!open) [http appendFormat:@"X-Repl-Session: %@\r\n",session];
+    if (run) [http appendFormat:@"X-Repl-Sequence: %lu\r\n",(unsigned long)sequence];
+    if (events) [http appendFormat:@"X-Repl-After: %lu\r\n",(unsigned long)sequence];
+    if (!events) [http appendFormat:@"Content-Length: %lu\r\n",(unsigned long)data.length];
+    [http appendString:@"\r\n"];
+    NSMutableData *request=[[http dataUsingEncoding:NSUTF8StringEncoding] mutableCopy];
+    if (!events) [request appendData:data];
+    ControllerRequest(credential,request,NO,completion);
 }
