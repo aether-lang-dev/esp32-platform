@@ -1,0 +1,14 @@
+// Aether UI entry point shared by desktop and the future UIKit app bundle.
+// No transport or credential storage is connected in this initial shell.
+import ui
+
+main() {
+    ui.window("Device controller", 390, 700) {
+        ui.vstack(16) {
+            ui.text("Device console")
+            ui.divider()
+            ui.text("No devices enrolled")
+            ui.text("Use your owner app to approve this phone.")
+        }
+    }
+}

@@ -1,5 +1,10 @@
 # esp32: Aether and RexxAE on ESP32 and ESP32-S3
 
+Repository layout: device firmware is in `firmware/esp-idf`, the working web
+controller in `clients/web`, and the Aether UI client foundation in
+`clients/native`. See [repository boundaries](docs/REPOSITORY.md). Legacy
+`project/` and `controller/` paths remain compatible during migration.
+
 Experimental work towards a "runner" firmware: an ESP32-S3 that takes Rexx
 scripts over the air and runs them with RexxAE, the embeddable Rexx engine
 written in Aether (`../RexxAE`). The target board is a Guition JC3248W535C
