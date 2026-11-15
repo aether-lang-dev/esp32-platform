@@ -1,0 +1,14 @@
+// C ABI boundary: buffers belong to the trusted native adapter.
+import tlsimpl
+exports(controller_tls_status)
+
+controller_tls_status(host: string, port: int, identity: ptr, identity_len: int,
+                      key: ptr, key_len: int, output: ptr, output_len: int,
+                      error: ptr, error_len: int) -> int {
+    if identity == null || key == null || output == null || error == null ||
+       identity_len < 1 || identity_len > 64 || key_len != 32 ||
+       output_len < 1 || output_len > 16384 || error_len < 1 || error_len > 256 { return -1 }
+    return tlsimpl.request(host, port, (identity as byte[])[0..identity_len],
+        (key as byte[])[0..key_len], (output as byte[])[0..output_len],
+        (error as byte[])[0..error_len])
+}

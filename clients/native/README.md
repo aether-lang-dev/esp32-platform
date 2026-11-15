@@ -1,9 +1,10 @@
 # Native controller
 
 app.ae is the Aether UI entry point. The development iPhone bundle now has
-native Keychain import and a bounded status transport adapter; it is signed
-and installed, but the real TLS1.3-PSK connection is not yet proven. The UI has rendered on the unlocked phone, but the synthetic TLS test also
-failed to complete there. The native TLS interoperability gap is recorded under asks/apple-external-psk-tls13.md. No real plug key was imported.
+local-only Keychain import and a pure-Aether TLS1.3 external-PSK provider.
+The native adapter reaches the real S60 from the Mac. The updated app is
+signed and installed; final phone-side validation needs an unlocked phone.
+See ios/README.md for the exact local Aether pin, tests and credential boundary.
 
 Check the portable source against that dependency:
 
@@ -22,7 +23,7 @@ under ios/. Use the toolkit's existing backend ABI and build conventions.
 Do not vendor or fork the toolkit just to package this app. The firmware
 AETHER_REF does not automatically select a compatible native UI toolchain.
 
-Next: finish the native TLS1.3-PSK proof using synthetic credentials, then
-exercise the real device console.
+Next: finish the phone-side synthetic and real-device proofs, then add the
+read-only Rexx console operation.
 Read ../../docs/REPOSITORY.md for the boundary and ../core/README.md for shared
 logic. Working browser UI remains at ../web/.

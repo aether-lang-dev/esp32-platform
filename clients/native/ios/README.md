@@ -1,62 +1,81 @@
-# iPhone development app
+# iPhone controller
 
-The interface is Aether UI using the existing UIKit backend. Objective-C
-adapters own Network.framework and local-only Keychain access. No Swift UI
-rewrite or vendored toolkit is used.
+The screen is Aether UI on UIKit. The native adapter owns local-only Keychain
+storage, socket deadlines and the bridge to a pure-Aether TLS1.3 client. It no
+longer relies on Network.framework for external PSK negotiation.
 
-Build/sign/install on a paired development phone:
+## Build and install
+
+The external-PSK API is currently on a local Aether branch, not a released
+stdlib. Set AETHER_TLS_DIR to that checkout; AETHER_TLS_REF identifies the
+exact tested commit. The builder checks the commit and clean TLS modules.
+It does not fetch or modify another checkout. AE/AETHERC must match its
+runtime (tested with0.917.0). The separate firmware pin is unchanged.
 
 ```sh
-IOS_DEVICE=<udid> IOS_NO_LAUNCH=1 python3 clients/native/ios/build.py
+AETHER_TLS_DIR=/path/to/tested/aether-checkout \
+  IOS_DEVICE=<udid> IOS_NO_LAUNCH=1 python3 clients/native/ios/build.py
 ```
 
-AE, AETHERC, AETHER_UI_DIR and IOS_TEAM may select the local toolchain/team.
-The wrapper uses the upstream tools/ios-app.sh in scratch, with exact-match
-integration checks, native sources and Network/Security frameworks. Build
-products stay in root build/native-ios. App-directory files are not bundled
-as resources. No credential belongs in the app bundle or source tree.
-
-A real iPhone15Pro build was signed and installed on2026-11-15. Launch initially failed while locked, then succeeded after unlocking. The
-user confirmed the Aether UI and both controls rendered. Synthetic credential
-import reached the native connection attempt, but strict TLS1.3 external PSK
-failed to complete against the synthetic server on the phone too. This is not
-yet a working connection proof to the plug. See asks/apple-external-psk-tls13.md. Do not
-infer a successful connection from successful app installation.
+The builder uses aether-ui/tools/ios-app.sh in scratch, with exact-match
+integration checks, native sources and a generated Aether transport library.
+Build products stay in root build/native-ios; source-directory files and
+credentials are never bundled. AETHER_UI_DIR and IOS_TEAM may select the
+local UIKit toolkit and development team. Native TLS code is linked into the
+app; no OpenSSL provider is required on the iPhone.
 
 ## Credential boundary
 
-For the development proof only, Xcode/devicectl may stage a bounded JSON file
-in the app's Library/Caches/owner-credential.json. Fields are identity, a
-64-character hex key, host and optional numericport. This is not QR enrollment.
-The Import button validates it, stores it as a non-synchronizing generic
-password with WhenPasscodeSetThisDeviceOnly accessibility, then removes the
-staging file after successful storage. Caches is not an iCloud backup source.
-No real device credential has been imported; only a synthetic fixture was
-imported for the test.
+For this development proof, Xcode/devicectl stages a bounded JSON file in
+Library/Caches/owner-credential.json. Fields: identity,64-character hex key,
+host and optional numericport. The current proof uses an IPv4 address to
+avoid unbounded DNS work. This is not QR/public-key enrollment.
 
-Private credential values stay in the native adapter, never in Aether UI
-state. Only public result text crosses the bridge. A developer diagnostic may
-write public status to Library/Caches/status-result.json for Xcode inspection.
-CONTROLLER_PROBE_AUTORUN triggers staged import/status only when explicitly
-set for a development launch. Default app usage is through the buttons.
+Import validates the record and saves it as a non-synchronizing Keychain
+generic password with WhenPasscodeSetThisDeviceOnly accessibility, removing
+the staging file after successful storage. Caches is not an iCloud backup
+source. Credential values remain behind the native bridge, never UI or Rexx
+state. The Aether transport receives bounded secret buffers, copies and wipes
+handshake key material; the adapter wipes its temporary decoded key too.
 
-## Transport checks
+Only public result text crosses into Aether UI. A development diagnostic may
+write it to Library/Caches/status-result.json. CONTROLLER_PROBE_AUTORUN runs
+staged import/status only when explicitly set during a developer launch;
+normal use is through the buttons. The initial phone fixture is synthetic;
+real-owner import must follow successful synthetic validation.
+
+## Authentication and bounds
+
+The client requires TLS1.3 external PSK with ephemeral key exchange. It uses
+RFC8446's external binder, not a resumption ticket. Unknown/wrong identities
+or keys, a certificate-only server and TLS1.2 are refused; there is no weaker
+fallback. The API generates fresh ephemeral entropy and handles P256 HRR.
+
+The native request has a ten-second absolute deadline. A duplicate socket
+reference permits cancellation without touching a reused descriptor. Requests
+are read-only GET/status, with at most16records/16384bytes, a required bounded
+Content-Length, no chunked framing and no redirects. Native JSON validation
+checks the status shape before displaying it.
+
+## Verification
 
 ```
 clients/native/ios/tests/check.sh
-clang -fobjc-arc -fblocks -Iclients/native/ios \
-  clients/native/ios/ControllerTransport.m \
-  clients/native/ios/tests/transport_probe.m \
-  -framework Foundation -framework Network -framework Security -o /tmp/controller-probe
-/tmp/controller-probe /absolute/private/device.json device-hostname
+AETHER_TLS_DIR=/path/to/tested/aether python3 clients/native/ios/tests/build_probe.py
+python3.13 clients/native/ios/tests/test_pure_transport.py /tmp/controller-pure-psk-probe
+/tmp/controller-pure-psk-probe /absolute/private/device.json device-ip
 ```
 
-These require macOS. The probe accepts an optional final port for synthetic
-loopback tests. A TLS1.2 diagnostic used scratch-only sources, not the shipped
-client or firmware. The client requires TLS1.3, bounds receive data and time,
-rejects certificate verification, and does not follow redirects.
+The Mac tests require PSK-capable Python3.13+ for independent synthetic peers.
+They cover success, wrong keys, redirects, oversized/truncated/chunked
+responses and a stalled peer. The actual S60 returned active6/floor6 through
+the native/Aether adapter without changing its TLS configuration. Aether's
+separate tests cover X25519, P256 retry, socket ownership, identity/key refusal,
+certificate/TLS1.2 refusal and input bounds. A resumption-binder mutation makes
+the independent handshake fail. Existing resumption/0RTT tests also pass.
 
-Next: resolve the TLS1.3 external-PSK provider and repeat the synthetic proof. Then add read-only ADDRESS through the device REPL. QR
-phone enrollment, per-phone public-key authentication and revocation remain
-future work. No cloud account, automatic key sync or implicit recovery export
-is implemented.
+The updated app is signed and installed. The phone-side proof still requires
+an unlocked phone; do not equate app installation or Mac success with an
+observed phone connection. See asks/apple-external-psk-tls13.md for the original
+Apple-provider finding and current validation status. QR enrollment and
+per-phone public-key authentication remain separate work.

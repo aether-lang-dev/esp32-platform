@@ -1,0 +1,67 @@
+// Privileged transport implementation, not UI state or a device guest.
+import std.tcp
+import std.bytes
+import std.string
+import std.cryptography.tls13_client
+exports(request)
+extern controller_tls_deadlines(sock: ptr) -> int
+
+fn refuse(why: string, error: byte[]) -> int {
+    text = string.bytes(why)
+    count = text.len
+    if count >= error.len { count = error.len - 1 }
+    for (i = 0; i < count; i++) { error[i] = text[i] }
+    if error.len > 0 { error[count] = 0 }
+    return -1
+}
+
+request(host: string, port: int, identity: byte[], key: byte[], output: byte[], error: byte[]) -> int {
+    if output.len < 1 || output.len > 16384 || error.len < 1 { return -1 }
+    sock, dialerr = tcp.connect_timeout(host, port, 5000)
+    if dialerr != "" { return refuse(dialerr, error) }
+    if controller_tls_deadlines(sock) != 0 {
+        tcp.close(sock)
+        return refuse("Could not set socket deadlines", error)
+    }
+    conn, tlserr = tls13_client.connect_socket_psk(sock, identity, key)
+    if tlserr != "" { return refuse(tlserr, error) }
+    defer tls13_client.close_conn(conn)
+    http = "GET /status HTTP/1.1\r\nHost: ${host}\r\nConnection: close\r\n\r\n"
+    senderr = tls13_client.conn_send(conn, string.bytes(http))
+    if senderr != "" { return refuse(senderr, error) }
+    accumulated = ""
+    for (record = 0; record < 16; record++) {
+        data, count, readerr = tls13_client.conn_recv(conn)
+        if readerr != "" { return refuse(readerr, error) }
+        if count == 0 { break }
+        part = bytes.to_string(data, count)
+        bytes.wipe_free(data)
+        accumulated = string.concat(accumulated, part)
+        if string.length(accumulated) > 16384 { return refuse("Response exceeds limit", error) }
+        split = string.index_of(accumulated, "\r\n\r\n")
+        if split >= 0 {
+            header = string.substring(accumulated, 0, split)
+            if !string.starts_with(header, "HTTP/1.1 200 ") && !string.starts_with(header, "HTTP/1.0 200 ") {
+                return refuse("Device rejected status request", error)
+            }
+            lower = string.to_lower(header)
+            if string.index_of(lower, "\r\ntransfer-encoding:") >= 0 { return refuse("Unsupported response framing", error) }
+            at = string.index_of(lower, "\r\ncontent-length:")
+            if at < 0 { return refuse("Missing response length", error) }
+            length_text = string.substring(header, at + 17, string.length(header))
+            end = string.index_of(length_text, "\r\n")
+            if end >= 0 { length_text = string.substring(length_text, 0, end) }
+            expected, lengtherr = string.to_int(string.trim(length_text))
+            if lengtherr != "" || expected < 0 || expected > output.len { return refuse("Invalid response length", error) }
+            body = string.substring(accumulated, split + 4, string.length(accumulated))
+            if string.length(body) > expected { return refuse("Invalid response length", error) }
+            if string.length(body) == expected {
+                raw = string.bytes(body)
+                if raw.len > output.len { return refuse("Response exceeds limit", error) }
+                for (i = 0; i < raw.len; i++) { output[i] = raw[i] }
+                return raw.len
+            }
+        }
+    }
+    return refuse("Incomplete device response", error)
+}
