@@ -1,18 +1,25 @@
 // Portable Aether UI, with secrets and network operations behind native handles.
 import ui
-import std.string
+import std.bytes
 extern controller_status_text() -> ptr
+extern controller_status_length() -> int
 extern controller_check_status()
 extern controller_import_credential()
 extern controller_probe_if_requested()
 
 main() {
+    // Explicit paired foreground/background: readable regardless of iOS appearance.
+    theme = ui.create_styles()
+    ui.st_color(theme, "text", 0xF2F2F2)
+    ui.st_bg(theme, "vstack", 0x18202A)
+    ui.use_styles(theme)
     status = 0
     ui.window("Device controller", 390, 700) {
         ui.vstack(16) {
-            ui.text("Device console")
+            ui.text("Device Console · b009")
             ui.divider()
-            status = ui.text("No owner credential imported")
+            status = ui.text("Tap Check plug status to connect")
+            ui.text_lines(status, 3)
             ui.btn("Import local credential") callback { controller_import_credential() }
             ui.btn("Check plug status") callback { controller_check_status() }
             ui.text("Credentials stay in this phone's Keychain.")
@@ -20,8 +27,8 @@ main() {
         ui.timer_once(800) callback { controller_probe_if_requested() }
         // Only public status text crosses this boundary.
         ui.timer(250) callback {
-            value, err = string.from_ptr(controller_status_text())
-            if err == "" { _updated = ui.set_text(status, value) }
+            value = bytes.string_from_ptr(controller_status_text(), controller_status_length())
+            _updated = ui.set_text(status, value)
         }
     }
 }
