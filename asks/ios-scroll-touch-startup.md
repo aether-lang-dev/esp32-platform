@@ -23,4 +23,9 @@ Existing UIKit Catalyst render/key/scroll-geometry tests pass, as do native
 credential/input/duplicate-command checks. A reusable XCTest tap suite lives at
 clients/native/ios/tests/touch/. It compiled, signed and launched its runner,
 but this phone timed out enabling automation mode before tests ran. This is
-not an automated tap PASS; physical taps were verified by Paul.
+not an automated tap PASS for that initial run; physical taps were verified by Paul.
+
+Update2026-11-15 17:52: the retry on b014 successfully enabled automation and
+passed the real-device XCTest suite (one test, zero failures). It tapped Status,
+Run, both RC/RESULT switches, Cancel and Reset, verified the app stayed in the
+foreground and that output included42. The previous automation blocker is gone.

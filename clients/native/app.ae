@@ -9,6 +9,8 @@ extern controller_console_length() -> int
 extern controller_console_revision() -> int
 extern controller_console_run(source: string, show_rc: int, show_result: int)
 extern controller_command_editor(handle: int)
+extern controller_history_begin(handle: int) -> int
+extern controller_history_end(handle: int, follow: int)
 extern controller_console_cancel()
 extern controller_console_reset()
 var shown_revision = -1
@@ -28,11 +30,12 @@ main() {
     command = 0
     auto_rc = 0
     auto_result = 0
+    output_scroll = 0
     ui.window("Device controller", 390, 700) {
         page = ui.scrollview() {
         ui.vstack(10) {
             ui.margin(12, 12, 12, 12)
-            ui.text("Device Console · b013")
+            ui.text("Device Console · b014")
             ui.divider()
             status = ui.text("Tap Check plug status to connect")
             ui.text_lines(status, 3)
@@ -81,7 +84,9 @@ main() {
             console_revision = controller_console_revision()
             if console_revision != shown_console_revision {
                 text = bytes.string_from_ptr(controller_console_text(), controller_console_length())
+                follow = controller_history_begin(output_scroll)
                 _history = ui.set_text(transcript, text)
+                controller_history_end(output_scroll, follow)
                 shown_console_revision = console_revision
             }
         }

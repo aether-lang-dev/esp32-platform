@@ -1,5 +1,6 @@
 #import "ControllerTransport.h"
 #import "ControllerConsole.h"
+#import "ControllerHistory.h"
 #import <Security/Security.h>
 #import <UIKit/UIKit.h>
 static NSString *display = @"Ready · tap Check plug status";
@@ -81,6 +82,7 @@ void controller_probe_if_requested(void) {
 static ControllerConsole *console;
 static NSString *consoleDisplay=@"Enter a command, then tap Run.";
 static int consoleRevision;
+static BOOL historyFollowRequested;
 static ControllerConsole *ownerConsole(void) {
     if (console) return console;
     NSMutableDictionary *query=[keyQuery() mutableCopy];
@@ -102,6 +104,7 @@ const char *controller_console_text(void) { return consoleDisplay.UTF8String; }
 int controller_console_length(void) { return (int)[consoleDisplay lengthOfBytesUsingEncoding:NSUTF8StringEncoding]; }
 int controller_console_revision(void) { return consoleRevision; }
 void controller_console_run(const char *source,int rc,int result) {
+    historyFollowRequested=YES;
     for (UIScene *scene in UIApplication.sharedApplication.connectedScenes)
         if ([scene isKindOfClass:[UIWindowScene class]])
             for (UIWindow *window in ((UIWindowScene *)scene).windows) [window endEditing:YES];
@@ -143,4 +146,16 @@ static void layoutProbe(void) {
             for (UIWindow *window in ((UIWindowScene *)scene).windows) layoutRows(window,window,rows);
     NSURL *cache=[[[NSFileManager defaultManager] URLsForDirectory:NSCachesDirectory inDomains:NSUserDomainMask] firstObject];
     [[NSJSONSerialization dataWithJSONObject:rows options:0 error:nil] writeToURL:[cache URLByAppendingPathComponent:@"console-layout.json"] atomically:YES];
+}
+
+int controller_history_begin(int handle) {
+    UIScrollView *scroll=(__bridge UIScrollView *)aether_ui_get_widget(handle);
+    if (![scroll isKindOfClass:[UIScrollView class]]) return 0;
+    BOOL follow=historyFollowRequested || ControllerHistoryAtBottom(scroll);
+    historyFollowRequested=NO;
+    return follow;
+}
+void controller_history_end(int handle,int follow) {
+    UIScrollView *scroll=(__bridge UIScrollView *)aether_ui_get_widget(handle);
+    if ([scroll isKindOfClass:[UIScrollView class]]) ControllerHistoryFollow(scroll,follow!=0);
 }

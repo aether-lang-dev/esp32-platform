@@ -166,5 +166,21 @@ IOS_TEAM=your-team IOS_DEVICE=your-device \
 ```
 
 The runner is bounded to180seconds and requires a fresh TOUCH_RESULT path if
-re-running with an existing xcresult. On this phone it compiled/signed but
-could not enable iOS automation mode, so the physical tap proof is manual.
+re-running with an existing xcresult. Its initial run could not enable iOS
+automation mode. The b014 retry on2026-11-15 passed on the physical iPhone:
+Status and Run updated results,42 appeared, both switches toggled, and Cancel
+and Reset kept the app in the foreground (one test, zero failures).
+
+
+Build b014 follows new console output at the bottom. Scroll up to read earlier
+history and incoming output preserves that position; pressing Run explicitly
+resumes following. Native code checks the prior position before changing the
+label, then resolves the new Auto Layout height before scrolling. It uses no
+scroll animation and does not fight a drag or deceleration already in progress.
+The near-bottom threshold is24points. The dedicated UIKit test covers append,
+scrollback preservation, explicit follow, short output, insets and changing
+Auto Layout content height:
+
+```
+sh clients/native/ios/tests/check_history.sh
+```
