@@ -3,6 +3,8 @@ import ui
 import std.bytes
 extern controller_status_text() -> ptr
 extern controller_status_length() -> int
+extern controller_status_revision() -> int
+var shown_revision = -1
 extern controller_check_status()
 extern controller_import_credential()
 extern controller_probe_if_requested()
@@ -16,10 +18,11 @@ main() {
     status = 0
     ui.window("Device controller", 390, 700) {
         ui.vstack(16) {
-            ui.text("Device Console · b009")
+            ui.text("Device Console · b010")
             ui.divider()
             status = ui.text("Tap Check plug status to connect")
             ui.text_lines(status, 3)
+            ui.set_height(status, 64)
             ui.btn("Import local credential") callback { controller_import_credential() }
             ui.btn("Check plug status") callback { controller_check_status() }
             ui.text("Credentials stay in this phone's Keychain.")
@@ -27,8 +30,12 @@ main() {
         ui.timer_once(800) callback { controller_probe_if_requested() }
         // Only public status text crosses this boundary.
         ui.timer(250) callback {
-            value = bytes.string_from_ptr(controller_status_text(), controller_status_length())
-            _updated = ui.set_text(status, value)
+            revision = controller_status_revision()
+            if revision != shown_revision {
+                value = bytes.string_from_ptr(controller_status_text(), controller_status_length())
+                _updated = ui.set_text(status, value)
+                shown_revision = revision
+            }
         }
     }
 }

@@ -4,8 +4,10 @@
 static NSString *display = @"No owner credential imported";
 static BOOL busy;
 static NSUInteger checks;
+static int revision;
 static void publish(NSString *text) {
     display = text;
+    revision++;
     NSURL *cache = [[[NSFileManager defaultManager] URLsForDirectory:NSCachesDirectory inDomains:NSUserDomainMask] firstObject];
     NSData *report = [NSJSONSerialization dataWithJSONObject:@{@"status":text} options:0 error:nil];
     [report writeToURL:[cache URLByAppendingPathComponent:@"status-result.json"] atomically:YES];
@@ -16,6 +18,7 @@ static NSDictionary *keyQuery(void) {
              (__bridge id)kSecAttrAccount:@"owner-v1",
              (__bridge id)kSecAttrSynchronizable:@NO};
 }
+int controller_status_revision(void) { return revision; }
 const char *controller_status_text(void) { return display.UTF8String; }
 int controller_status_length(void) { return (int)[display lengthOfBytesUsingEncoding:NSUTF8StringEncoding]; }
 void controller_import_credential(void) {
