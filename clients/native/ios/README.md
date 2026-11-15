@@ -16,10 +16,11 @@ integration checks, native sources and Network/Security frameworks. Build
 products stay in root build/native-ios. App-directory files are not bundled
 as resources. No credential belongs in the app bundle or source tree.
 
-A real iPhone15Pro build was signed and installed on2026-11-15. Launch was
-refused while the phone was locked; unlock it to continue. This is not yet a
-working connection proof to the plug: strict TLS1.3 external PSK currently
-fails on the macOS native probe. See asks/apple-external-psk-tls13.md. Do not
+A real iPhone15Pro build was signed and installed on2026-11-15. Launch initially failed while locked, then succeeded after unlocking. The
+user confirmed the Aether UI and both controls rendered. Synthetic credential
+import reached the native connection attempt, but strict TLS1.3 external PSK
+failed to complete against the synthetic server on the phone too. This is not
+yet a working connection proof to the plug. See asks/apple-external-psk-tls13.md. Do not
 infer a successful connection from successful app installation.
 
 ## Credential boundary
@@ -30,8 +31,8 @@ in the app's Library/Caches/owner-credential.json. Fields are identity, a
 The Import button validates it, stores it as a non-synchronizing generic
 password with WhenPasscodeSetThisDeviceOnly accessibility, then removes the
 staging file after successful storage. Caches is not an iCloud backup source.
-No real device credential has been imported in the initial test; only a
-synthetic fixture has been staged.
+No real device credential has been imported; only a synthetic fixture was
+imported for the test.
 
 Private credential values stay in the native adapter, never in Aether UI
 state. Only public result text crosses the bridge. A developer diagnostic may
@@ -55,8 +56,7 @@ loopback tests. A TLS1.2 diagnostic used scratch-only sources, not the shipped
 client or firmware. The client requires TLS1.3, bounds receive data and time,
 rejects certificate verification, and does not follow redirects.
 
-Next: unlock and prove this on the phone; resolve the TLS provider if the
-failure reproduces. Then add read-only ADDRESS through the device REPL. QR
+Next: resolve the TLS1.3 external-PSK provider and repeat the synthetic proof. Then add read-only ADDRESS through the device REPL. QR
 phone enrollment, per-phone public-key authentication and revocation remain
 future work. No cloud account, automatic key sync or implicit recovery export
 is implemented.

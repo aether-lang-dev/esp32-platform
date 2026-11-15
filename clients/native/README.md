@@ -2,9 +2,8 @@
 
 app.ae is the Aether UI entry point. The development iPhone bundle now has
 native Keychain import and a bounded status transport adapter; it is signed
-and installed, but the real TLS1.3-PSK connection is not yet proven. The phone
-must be unlocked for launch, and the native TLS interoperability gap is
-recorded under asks/apple-external-psk-tls13.md. No real plug key was imported.
+and installed, but the real TLS1.3-PSK connection is not yet proven. The UI has rendered on the unlocked phone, but the synthetic TLS test also
+failed to complete there. The native TLS interoperability gap is recorded under asks/apple-external-psk-tls13.md. No real plug key was imported.
 
 Check the portable source against that dependency:
 

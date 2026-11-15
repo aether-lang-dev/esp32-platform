@@ -20,9 +20,15 @@ A certificate-only synthetic TLS1.3 server is rejected; no accept-all trust
 callback was introduced. The certificate verify callback explicitly rejects.
 
 The attached iPhone15Pro has a signed Aether UI build installed. Its actual
-TLS test is pending an unlocked phone. Only synthetic credentials were staged
-in its non-backup cache; the real plug key has not been transferred. Test on
-that runtime before concluding the macOS finding applies to iOS.
+TLS test ran after unlocking. User confirmed the Aether UI screen and both
+controls were visible. The synthetic LAN server accepted a connection, then
+reported unexpected EOF during TLS. The phone's public report eventually
+showed waiting/ECONNREFUSED after the one-shot server had exited. That final
+POSIX code is secondary, not the initial TLS error. Only a synthetic
+credential was imported to local-only Keychain; the real plug key has not
+been transferred. The configured strict TLS1.3 path is not interoperable on
+either tested runtime; this does not establish that every Apple configuration
+or OS release has the same limitation.
 
 If this persists, prefer a tested TLS1.3 external-PSK provider rather than
 weakening firmware TLS. Aether's pure-Aether std.cryptography.tls13_client has
