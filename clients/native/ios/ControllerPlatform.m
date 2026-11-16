@@ -81,6 +81,7 @@ void controller_probe_if_requested(void) {
 }
 
 static ControllerConsole *console;
+static NSString *targetText=@"Target: no owner credential enrolled";
 static NSString *consoleDisplay=@"Enter a command, then tap Run.";
 static int consoleRevision;
 static BOOL historyFollowRequested;
@@ -93,6 +94,7 @@ static ControllerConsole *ownerConsole(void) {
     NSData *raw=CFBridgingRelease(value);
     NSDictionary *credential=[NSJSONSerialization JSONObjectWithData:raw options:0 error:nil];
     if (!ControllerCredentialValid(credential)) return nil;
+    targetText=[NSString stringWithFormat:@"Target: %@:%@",credential[@"host"],credential[@"port"] ?: @443];
     console=[[ControllerConsole alloc] initWithCredential:credential];
     console.changed=^{
         consoleDisplay=console.text; consoleRevision++;
@@ -187,18 +189,19 @@ int controller_console_recalled_length(void) { return (int)[recalled lengthOfByt
 static NSMutableDictionary<NSString *,NSString *> *actionValues;
 static int actionRevision;
 static NSString *actionLabel(NSString *identifier) {
-    return @{@"app":@"App",@"relay":@"Relay",@"countdown":@"Countdown"}[identifier] ?: @"Action";
+    return @{@"app":@"App",@"relay":@"Relay",@"countdown":@"Countdown",@"on10":@"On 10 seconds",@"on30":@"On 30 seconds",@"off":@"Off"}[identifier] ?: @"Action";
 }
 static void actionPublish(NSString *identifier,NSString *text) {
     if (!actionValues) actionValues=[NSMutableDictionary dictionary];
-    actionValues[identifier]=text; actionRevision++;
+    actionValues[ControllerActionIsControl(identifier) ? @"control" : identifier]=text; actionRevision++;
     NSURL *cache=[[[NSFileManager defaultManager] URLsForDirectory:NSCachesDirectory inDomains:NSUserDomainMask] firstObject];
     [[NSJSONSerialization dataWithJSONObject:actionValues options:0 error:nil] writeToURL:[cache URLByAppendingPathComponent:@"named-actions.json"] atomically:YES];
 }
 static NSString *actionText(void) {
     return [@[(actionValues[@"app"] ?: @"App: not checked"),
               (actionValues[@"relay"] ?: @"Relay: not checked"),
-              (actionValues[@"countdown"] ?: @"Countdown: not checked")] componentsJoinedByString:@"\n"];
+              (actionValues[@"countdown"] ?: @"Countdown: not checked"),
+              (actionValues[@"control"] ?: @"Timed controls: ready")] componentsJoinedByString:@"\n"];
 }
 const char *controller_actions_text(void) { return actionText().UTF8String; }
 int controller_actions_length(void) { return (int)[actionText() lengthOfBytesUsingEncoding:NSUTF8StringEncoding]; }
@@ -210,12 +213,19 @@ void controller_named_action(const char *name) {
     ControllerConsole *owner=ownerConsole();
     if (!owner) { actionPublish(identifier,[NSString stringWithFormat:@"%@: import an owner credential first",actionLabel(identifier)]); return; }
     if (owner.busy) { actionPublish(identifier,[NSString stringWithFormat:@"%@: console busy · try again when idle",actionLabel(identifier)]); return; }
+    if (ControllerActionIsControl(identifier)) {
+        actionPublish(@"relay",@"Relay: refresh after command");
+        actionPublish(@"countdown",@"Countdown: refresh after command");
+    }
     actionPublish(identifier,[NSString stringWithFormat:@"%@: checking…",actionLabel(identifier)]);
     [owner runNamedSource:source completion:^(NSString *output,NSString *error){
         NSString *failure=error;
         NSString *summary=error ? nil : ControllerActionSummary(identifier,output,&failure);
         NSDateFormatter *clock=[NSDateFormatter new]; clock.dateFormat=@"HH:mm:ss";
         NSString *text=summary ?: [NSString stringWithFormat:@"%@: unavailable · %@",actionLabel(identifier),failure ?: @"invalid response"];
-        actionPublish(identifier,[NSString stringWithFormat:@"%@ · %@",text,[clock stringFromDate:[NSDate date]]]);
+        actionPublish(identifier,[NSString stringWithFormat:@"%@%@ · %@",ControllerActionIsControl(identifier) ? @"Last command: " : @"",text,[clock stringFromDate:[NSDate date]]]);
     }];
 }
+
+const char *controller_target_text(void) { (void)ownerConsole(); return targetText.UTF8String; }
+int controller_target_length(void) { (void)ownerConsole(); return (int)[targetText lengthOfBytesUsingEncoding:NSUTF8StringEncoding]; }

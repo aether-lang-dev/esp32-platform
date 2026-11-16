@@ -23,6 +23,8 @@ extern controller_console_recalled_length() -> int
 var shown_revision = -1
 var shown_console_revision = -1
 extern controller_named_action(name: string)
+extern controller_target_text() -> ptr
+extern controller_target_length() -> int
 extern controller_actions_text() -> ptr
 extern controller_actions_length() -> int
 extern controller_actions_revision() -> int
@@ -49,24 +51,32 @@ main() {
         page = ui.scrollview() {
         ui.vstack(10) {
             ui.margin(12, 12, 12, 12)
-            ui.text("Device Console · b018")
+            ui.text("Device Console · b019")
             ui.divider()
             status = ui.text("Tap Check plug status to connect")
             ui.text_lines(status, 3)
             ui.set_height(status, 64)
             ui.btn("Import local credential") callback { controller_import_credential() }
             ui.btn("Check plug status") callback { controller_check_status() }
-            ui.text("Smart plug · read-only actions")
+            ui.text("Smart plug")
+            target_text = bytes.string_from_ptr(controller_target_text(), controller_target_length())
+            target = ui.text(target_text)
+            ui.text_lines(target, 2)
+            ui.hstack(12) {
+                ui.btn("On 10 seconds") callback { controller_named_action("on10") }
+                ui.btn("On 30 seconds") callback { controller_named_action("on30") }
+                ui.btn("Off") callback { controller_named_action("off") }
+            }
             actions = ui.text("App: not checked\nRelay: not checked\nCountdown: not checked")
-            ui.text_lines(actions, 8)
-            ui.set_height(actions, 164)
+            ui.text_lines(actions, 10)
+            ui.set_height(actions, 204)
             ui.hstack(10) {
                 ui.btn("App status") callback { controller_named_action("app") }
                 ui.btn("Relay status") callback { controller_named_action("relay") }
                 ui.btn("Countdown status") callback { controller_named_action("countdown") }
             }
             ui.divider()
-            ui.text("Read-only Rexx console")
+            ui.text("Rexx console · timed outlet control")
             session_state = ui.text("No session · Run opens one")
             ui.text_lines(session_state, 2)
             ui.set_height(session_state, 44)

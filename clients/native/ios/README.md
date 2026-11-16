@@ -285,3 +285,58 @@ use TOUCH_ONLY=TouchTests/ConsoleTouchTests/testNamedActions to run just the nam
 panel test. TOUCH_BUILD_ONLY=1 compiles/signs the suite without a connected phone;
 that is a build check, not an interaction pass. All runs need IOS_TEAM and a
 fresh TOUCH_RESULT; real runs also need IOS_DEVICE.
+
+
+## Timed outlet controls (b019)
+
+Adds On 10 seconds, On 30 seconds and Off, with the configured device endpoint
+shown above the buttons. These are fixed named Rexx fragments addressing OUTLET
+START 10, START 30 and CANCEL. There is no indefinite On or interpolated duration.
+The host's existing timer owns the deadline; closing the console/phone does not
+cancel the timer or prevent automatic Off. No firmware reflash is needed.
+
+The owner REPL session now requests mask 25667: the b018 status/timer reads plus
+OUTLET_CONTROL. Typed console code can also use OUTLET START 1..60 and CANCEL.
+Direct SWITCH writes, APPS RUN/CALL and unrelated host capabilities remain denied.
+Off cancels the OUTLET-owned countdown; another service's output ownership is
+not bypassed. If the console is busy, the action is rejected; cancel/wait for the
+running command and press Off again. This is not a separate emergency channel.
+
+Replies must confirm a valid outlet state within the selected preset's bound.
+Off requires idle / 0 seconds and no competing owner; it never reports success for
+an active timer or busy output. An On acknowledgement is never automatically
+retried if its response is lost. Results are labelled Last command with a check
+time, rather than presenting old acknowledgements as live relay state. A control
+attempt invalidates prior relay/countdown snapshots; use their status buttons to
+refresh them. Commands are not broadcast or queued for another device.
+
+Verification completed2026-11-16 with the user-confirmed empty S60 outlet:
+
+- Native unit tests cover preset allowlisting, bounded acknowledgements, Off
+  validation and ownership conflicts. Exact firmware permission functions confirm
+  OUTLET control is allowed while direct relay/app control remains denied.
+- An independent TLS peer passes timed controls and expiry after session close;
+  a lost On reply produces failure with exactly one On submission.
+- The real S60 passed Off, On 10 seconds, Relay ON, session close, automatic Relay
+  OFF/countdown idle after 12 seconds, On 30 seconds, explicit Off and final OFF/idle.
+  Direct relay control was denied RC13. The test session was closed at the end.
+- Existing named status/error regressions pass. b019 and its timed-control XCTest
+  compile and sign. Phone installation/taps are pending because USB disconnected;
+  the currently installed phone build remains b018.
+
+Live control tests are opt-in so ordinary UI regression runs cannot energize an
+outlet. After confirming the outlet is empty:
+
+```
+ALLOW_LIVE_OUTLET_CONTROL=1 /tmp/controller-outlet-control-probe /private/device.json device-ip
+IOS_TEAM=your-team IOS_DEVICE=your-device ALLOW_LIVE_OUTLET_CONTROL=1 \
+  TOUCH_ONLY=TouchTests/ConsoleTouchTests/testTimedOutletControls \
+  TOUCH_RESULT=/tmp/fresh-timed-control.xcresult \
+  python3 clients/native/ios/tests/touch/run.py
+```
+
+Build the native probe with CONTROLLER_PROBE_SOURCE=outlet_control_probe.m and
+CONTROLLER_PROBE_OUTPUT=/tmp/controller-outlet-control-probe using build_probe.py.
+The independent peer tests are test_outlet_control_transport.py(probe), with
+an optional drop-on-reply argument for the no-retry negative case. They use only
+synthetic credentials and do not connect to a real outlet.

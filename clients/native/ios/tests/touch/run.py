@@ -9,6 +9,7 @@ team = os.environ['IOS_TEAM']
 build_only = os.environ.get('TOUCH_BUILD_ONLY') == '1'
 device = os.environ.get('IOS_DEVICE')
 assert build_only or device, 'Set IOS_DEVICE for a real-device run'
+allow_control = '1' if os.environ.get('ALLOW_LIVE_OUTLET_CONTROL') == '1' else '0'
 idle_seconds = float(os.environ.get('CONSOLE_IDLE_SECONDS', '125'))
 assert 0 <= idle_seconds <= 180
 with tempfile.TemporaryDirectory(prefix='controller-touch-') as folder:
@@ -33,8 +34,8 @@ with tempfile.TemporaryDirectory(prefix='controller-touch-') as folder:
 }; rootObject=A00000000000000000000008;}
 '''.replace('TEAM_ID',team))
     (project/'xcshareddata/xcschemes/Touch.xcscheme').write_text('''<?xml version="1.0" encoding="UTF-8"?>
-<Scheme version="1.7"><BuildAction><BuildActionEntries><BuildActionEntry buildForTesting="YES"><BuildableReference BuildableIdentifier="primary" BlueprintIdentifier="A00000000000000000000007" BuildableName="TouchTests.xctest" BlueprintName="TouchTests" ReferencedContainer="container:Touch.xcodeproj"/></BuildActionEntry></BuildActionEntries></BuildAction><TestAction buildConfiguration="Debug"><EnvironmentVariables><EnvironmentVariable key="CONSOLE_IDLE_SECONDS" value="IDLE_SECONDS" isEnabled="YES"/></EnvironmentVariables><Testables><TestableReference skipped="NO"><BuildableReference BuildableIdentifier="primary" BlueprintIdentifier="A00000000000000000000007" BuildableName="TouchTests.xctest" BlueprintName="TouchTests" ReferencedContainer="container:Touch.xcodeproj"/></TestableReference></Testables></TestAction></Scheme>
-'''.replace('IDLE_SECONDS',str(idle_seconds)))
+<Scheme version="1.7"><BuildAction><BuildActionEntries><BuildActionEntry buildForTesting="YES"><BuildableReference BuildableIdentifier="primary" BlueprintIdentifier="A00000000000000000000007" BuildableName="TouchTests.xctest" BlueprintName="TouchTests" ReferencedContainer="container:Touch.xcodeproj"/></BuildActionEntry></BuildActionEntries></BuildAction><TestAction buildConfiguration="Debug"><EnvironmentVariables><EnvironmentVariable key="CONSOLE_IDLE_SECONDS" value="IDLE_SECONDS" isEnabled="YES"/><EnvironmentVariable key="ALLOW_LIVE_OUTLET_CONTROL" value="ALLOW_CONTROL" isEnabled="YES"/></EnvironmentVariables><Testables><TestableReference skipped="NO"><BuildableReference BuildableIdentifier="primary" BlueprintIdentifier="A00000000000000000000007" BuildableName="TouchTests.xctest" BlueprintName="TouchTests" ReferencedContainer="container:Touch.xcodeproj"/></TestableReference></Testables></TestAction></Scheme>
+'''.replace('IDLE_SECONDS',str(idle_seconds)).replace('ALLOW_CONTROL',allow_control))
     result = os.environ.get('TOUCH_RESULT', '/tmp/controller-touch.xcresult')
     selection = ['-only-testing:'+os.environ['TOUCH_ONLY']] if os.environ.get('TOUCH_ONLY') else []
     subprocess.run(['xcodebuild','-project',str(project),'-scheme','Touch','-destination',('generic/platform=iOS' if build_only else 'id='+device),

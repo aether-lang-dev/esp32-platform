@@ -18,11 +18,41 @@ final class ConsoleTouchTests: XCTestCase {
         let text = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", fragment)).firstMatch
         XCTAssertTrue(text.waitForExistence(timeout: 15), "Missing output: \(fragment)\n\(app.debugDescription)")
     }
+    func testTimedOutletControls() throws {
+        try XCTSkipUnless(ProcessInfo.processInfo.environment["ALLOW_LIVE_OUTLET_CONTROL"] == "1", "Requires confirmed empty bench outlet")
+        continueAfterFailure = false
+        let app = XCUIApplication(bundleIdentifier: "dev.aether.controller")
+        if app.state == .runningForeground || app.state == .runningBackground { app.activate() } else { app.launch() }
+        XCTAssertTrue(app.staticTexts["Device Console · b019"].waitForExistence(timeout: 15))
+        XCTAssertTrue(app.staticTexts["Target: 192.168.0.119:443"].exists)
+        tap("Reset session", in: app)
+        tap("Off", in: app)
+        output("Last command: Outlet: OFF", in: app)
+        tap("On 10 seconds", in: app)
+        output("Last command: Outlet: ON · auto-off in 10 s", in: app)
+        tap("Relay status", in: app)
+        output("Relay: ON", in: app)
+        tap("Reset session", in: app)
+        let elapsed = expectation(description: "plug timer expires without a console session")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 12) { elapsed.fulfill() }
+        wait(for: [elapsed], timeout: 18)
+        tap("Relay status", in: app)
+        output("Relay: OFF", in: app)
+        tap("On 30 seconds", in: app)
+        output("Last command: Outlet: ON · auto-off in 30 s", in: app)
+        tap("Off", in: app)
+        output("Last command: Outlet: OFF", in: app)
+        tap("Relay status", in: app)
+        output("Relay: OFF", in: app)
+        tap("Countdown status", in: app)
+        output("Countdown: idle · 0 s", in: app)
+        tap("Reset session", in: app)
+    }
     func testNamedActions() {
         continueAfterFailure = false
         let app = XCUIApplication(bundleIdentifier: "dev.aether.controller")
         if app.state == .runningForeground || app.state == .runningBackground { app.activate() } else { app.launch() }
-        XCTAssertTrue(app.staticTexts["Device Console · b018"].waitForExistence(timeout: 15))
+        XCTAssertTrue(app.staticTexts["Device Console · b019"].waitForExistence(timeout: 15))
         tap("Reset session", in: app)
         tap("App status", in: app)
         output("App: s60-bench · v6 · floor 6", in: app)
@@ -49,7 +79,7 @@ final class ConsoleTouchTests: XCTestCase {
         } else {
             app.launch()
         }
-        XCTAssertTrue(app.staticTexts["Device Console · b018"].waitForExistence(timeout: 15))
+        XCTAssertTrue(app.staticTexts["Device Console · b019"].waitForExistence(timeout: 15))
         tap("Check plug status", in: app)
         output("Connected · app v6", in: app)
         tap("Reset session", in: app)

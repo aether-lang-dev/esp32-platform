@@ -42,3 +42,9 @@ Countdown status actions through Rexx ADDRESS. Independent TLS, firmware
 permission checks, live S60 validation and the physical-phone tap suite pass.
 Control stays denied. Fleet support is the next increment; see FLEET.md for
 per-device ownership and isolation acceptance checks.
+
+Prepared b019 adds fixed 10/30-second On and Off through the native OUTLET service,
+with an explicit target label. Empty-outlet live S60 timer/Off tests pass and
+leave it OFF; phone installation and tap verification await USB reconnection.
+The owner console gains bounded OUTLET control, while direct relay/app writes
+remain denied. No indefinite On or firmware update is included.

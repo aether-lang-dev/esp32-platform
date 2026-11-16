@@ -18,8 +18,9 @@ is the next implementation step, not a capability already present in b018.
 - Separate status timestamps, results, transcript, editor draft, command recall,
   session handle, command/event counters, keepalive and error state per device.
   Preserve each context while switching between devices in the foreground.
-- Keep controls read-only initially. Do not add bulk switching as part of the
-  list/credential refactor. Keep the existing firmware and grant checks.
+- Preserve explicit per-device timed OUTLET controls added in b019. Do not add
+  bulk switching as part of the list/credential refactor. Bind every control
+  group to its displayed target and keep the existing firmware/grant checks.
 
 ## Ownership boundary
 
