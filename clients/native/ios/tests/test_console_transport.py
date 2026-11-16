@@ -50,7 +50,7 @@ def serve():
                 assert len(body) == length
                 code = 200
                 if path == '/repl/open':
-                    assert method == 'POST' and body == b'9283'
+                    assert method == 'POST' and body == b'25667'
                     sessions += 1
                     sequence = cursor = 0
                     response = {'session':f'{sessions:032x}', 'sequence':0}

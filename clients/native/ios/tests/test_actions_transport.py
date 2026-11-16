@@ -27,7 +27,7 @@ reads = {
     "ADDRESS SWITCH 'STATUS'": 'OFF',
     "ADDRESS OUTLET 'STATUS'": '{"app":"outlet","state":"idle","remaining":0,"busy":false}',
 }
-denied = ["ADDRESS SWITCH 'ON 1'", "ADDRESS OUTLET 'START 1'", "ADDRESS OUTLET 'CANCEL'", "ADDRESS APPS 'RUN main'", "ADDRESS APPS 'CALL main outlet CANCEL'"]
+denied = ["ADDRESS SWITCH 'ON 1'", "ADDRESS APPS 'RUN main'", "ADDRESS APPS 'CALL main outlet CANCEL'"]
 
 def serve():
     global closed
@@ -58,9 +58,9 @@ def serve():
                 assert len(body)==size
                 code = 200
                 if path=='/repl/open':
-                    assert method=='POST' and body==b'9283'
+                    assert method=='POST' and body==b'25667'
                     grants = int(body)
-                    assert grants & (128|16384|32768|2048|4096)==0
+                    assert grants & 16384 and grants & (128|32768|2048|4096)==0
                     response = {'session':'a'*32,'sequence':0}
                     code = 201
                 else:
@@ -117,9 +117,9 @@ with tempfile.TemporaryDirectory() as folder:
     assert not errors, errors
     if mode=='correct':
         assert result.returncode==0, (result.stdout,result.stderr)
-        assert closed and len(commands)==8, (closed,commands)
+        assert closed and len(commands)==6, (closed,commands)
         assert all(value in result.stdout for value in ('App: bench · v6 · floor 6','Relay: OFF','Countdown: idle · 0 s'))
-        print('Named action round-trips, read-only grants, fragmented replies, denials and clean recall PASS')
+        print('Named action round-trips, bounded grants, fragmented replies, denials and clean recall PASS')
     else:
         expected = {'denied-read':'Action rejected (RC 13)','bad-result':'Invalid app status','lost-output':'output lost','runtime-error':'did not complete successfully'}[mode]
         assert result.returncode!=0 and expected in result.stderr, (mode,result.stdout,result.stderr)

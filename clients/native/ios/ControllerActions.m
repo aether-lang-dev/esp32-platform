@@ -1,8 +1,9 @@
 #import "ControllerActions.h"
 #import <math.h>
+BOOL ControllerActionIsControl(NSString *identifier) { return [@[@"on10",@"on30",@"off"] containsObject:identifier ?: @""]; }
 NSString *ControllerActionSource(NSString *identifier) {
     if (![identifier isKindOfClass:[NSString class]]) return nil;
-    NSDictionary *commands=@{@"app":@"ADDRESS APPS 'STATUS main'",@"relay":@"ADDRESS SWITCH 'STATUS'",@"countdown":@"ADDRESS OUTLET 'STATUS'"};
+    NSDictionary *commands=@{@"app":@"ADDRESS APPS 'STATUS main'",@"relay":@"ADDRESS SWITCH 'STATUS'",@"countdown":@"ADDRESS OUTLET 'STATUS'",@"on10":@"ADDRESS OUTLET 'START 10'",@"on30":@"ADDRESS OUTLET 'START 30'",@"off":@"ADDRESS OUTLET 'CANCEL'"};
     NSString *command=commands[identifier];
     if (!command) return nil;
     return [command stringByAppendingString:@"\nSAY 'AE_ACTION_RC=' RC\nSAY 'AE_ACTION_RESULT=' RESULT"];
@@ -44,5 +45,16 @@ NSString *ControllerActionSummary(NSString *identifier,NSString *output,NSString
     if (![body[@"app"] isEqual:@"outlet"] || !integer(body[@"remaining"]) || [body[@"remaining"] intValue]>60 ||
         ![busy isKindOfClass:[NSNumber class]] || CFGetTypeID((__bridge CFTypeRef)busy)!=CFBooleanGetTypeID() ||
         ![body[@"state"] isEqual:([body[@"remaining"] intValue] ? @"running" : @"idle")]) return refuse(error,@"Invalid countdown status");
+    if (ControllerActionIsControl(identifier)) {
+        int remaining=[body[@"remaining"] intValue];
+        if ([busy boolValue]) return refuse(error,@"Output belongs to another service");
+        if ([identifier isEqual:@"off"]) {
+            if (remaining) return refuse(error,@"Off was not confirmed");
+            return @"Outlet: OFF";
+        }
+        int maximum=[identifier isEqual:@"on10"] ? 10 : 30;
+        if (remaining<1 || remaining>maximum) return refuse(error,@"Timed On was not confirmed");
+        return [NSString stringWithFormat:@"Outlet: ON · auto-off in %d s",remaining];
+    }
     return [NSString stringWithFormat:@"Countdown: %@ · %@ s%@",body[@"state"],body[@"remaining"],[busy boolValue] ? @" · output busy" : @""];
 }

@@ -22,7 +22,7 @@
 @end
 @implementation ControllerConsole
 - (instancetype)initWithCredential:(NSDictionary *)credential {
-    if ((self=[super init])) { _credential=[credential copy]; _commands=[NSMutableArray array]; _draft=@""; _history=[NSMutableString stringWithString:@"Read-only console · timers, app, relay and countdown status\n"]; }
+    if ((self=[super init])) { _credential=[credential copy]; _commands=[NSMutableArray array]; _draft=@""; _history=[NSMutableString stringWithString:@"Owner console · status and bounded timed-outlet control\n"]; }
     return self;
 }
 - (NSString *)text { return [self.history copy]; }

@@ -9,7 +9,7 @@ int main(int argc,const char **argv) {
         if (argc==4) credential[@"port"]=@([@(argv[3]) intValue]);
         ControllerConsole *console=[[ControllerConsole alloc] initWithCredential:credential];
         NSArray *names=@[@"app",@"relay",@"countdown"];
-        NSArray *denied=@[@"ADDRESS SWITCH 'ON 1'",@"ADDRESS OUTLET 'START 1'",@"ADDRESS OUTLET 'CANCEL'",@"ADDRESS APPS 'RUN main'",@"ADDRESS APPS 'CALL main outlet CANCEL'"];
+        NSArray *denied=@[@"ADDRESS SWITCH 'ON 1'",@"ADDRESS APPS 'RUN main'",@"ADDRESS APPS 'CALL main outlet CANCEL'"];
         __block NSUInteger index=0;
         dispatch_source_t timer=dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER,0,0,dispatch_get_main_queue());
         dispatch_source_set_timer(timer,DISPATCH_TIME_NOW,100*NSEC_PER_MSEC,10*NSEC_PER_MSEC);

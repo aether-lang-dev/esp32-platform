@@ -14,6 +14,13 @@ int main(void) {
         for (NSString *text in invalid) require(!ControllerActionSummary(@"relay",text,&error) && error.length,"malformed or rejected response not success");
         require(!ControllerActionSummary(@"app",packet(@"{\"app\":\"main\",\"name\":\"bench\",\"activeVersion\":true,\"highestVersion\":7}"),&error),"boolean version refused");
         require(!ControllerActionSummary(@"countdown",packet(@"{\"app\":\"outlet\",\"state\":\"idle\",\"remaining\":30,\"busy\":false}"),&error),"inconsistent countdown refused");
+        require([ControllerActionSource(@"on10") hasPrefix:@"ADDRESS OUTLET 'START 10'\n"] && [ControllerActionSource(@"on30") hasPrefix:@"ADDRESS OUTLET 'START 30'\n"] && [ControllerActionSource(@"off") hasPrefix:@"ADDRESS OUTLET 'CANCEL'\n"],"fixed bounded control sources");
+        require(!ControllerActionSource(@"on") && !ControllerActionSource(@"on999"),"no indefinite or arbitrary On");
+        require([ControllerActionSummary(@"on10",packet(@"{\"app\":\"outlet\",\"state\":\"running\",\"remaining\":10,\"busy\":false}"),&error) isEqual:@"Outlet: ON · auto-off in 10 s"],"timed On acknowledgement");
+        require([ControllerActionSummary(@"off",packet(@"{\"app\":\"outlet\",\"state\":\"idle\",\"remaining\":0,\"busy\":false}"),&error) isEqual:@"Outlet: OFF"],"Off acknowledgement");
+        require(!ControllerActionSummary(@"on10",packet(@"{\"app\":\"outlet\",\"state\":\"running\",\"remaining\":30,\"busy\":false}"),&error),"reject longer than selected preset");
+        require(!ControllerActionSummary(@"off",packet(@"{\"app\":\"outlet\",\"state\":\"running\",\"remaining\":1,\"busy\":false}"),&error),"never report Off while timer runs");
+        require(!ControllerActionSummary(@"off",packet(@"{\"app\":\"outlet\",\"state\":\"idle\",\"remaining\":0,\"busy\":true}"),&error),"never report Off when another owner holds output");
         puts("Named action allowlist, framing, denial and typed status validation PASS");
     }
     return 0;

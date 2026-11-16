@@ -107,8 +107,8 @@ void ControllerReplRequest(NSDictionary *credential, NSString *action, NSString 
     BOOL open=[action isEqual:@"open"], events=[action isEqual:@"events"], run=[action isEqual:@"run"];
     NSCharacterSet *bad=[[NSCharacterSet characterSetWithCharactersInString:@"0123456789abcdef"] invertedSet];
     if (!open && (session.length!=32 || [session rangeOfCharacterFromSet:bad].location!=NSNotFound)) { completion(nil,@"Invalid console session"); return; }
-    // Read-only session: timers, APPS_READ, SWITCH_READ and OUTLET_READ.
-    NSString *body=open ? @"9283" : (run ? source : @"");
+    // Owner session: status reads plus bounded OUTLET_CONTROL; no direct relay/app writes.
+    NSString *body=open ? @"25667" : (run ? source : @"");
     NSData *data=[body dataUsingEncoding:NSUTF8StringEncoding];
     if (!data || (run && (!data.length || data.length>8192 || [body rangeOfString:@"\0"].location!=NSNotFound))) { completion(nil,@"Command must be 1–8192 UTF-8 bytes without NUL"); return; }
     NSMutableString *http=[NSMutableString stringWithFormat:@"%@ %@ HTTP/1.1\r\nHost: %@\r\nConnection: close\r\n",events ? @"GET" : @"POST",routes[action],credential[@"host"]];
