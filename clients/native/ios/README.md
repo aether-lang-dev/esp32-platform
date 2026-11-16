@@ -259,10 +259,13 @@ replies, with four negative cases (denied read, malformed result, output loss,
 runtime failure). The updated ordinary console lifecycle regression also runs.
 The new physical-phone test compiles and signs in build-only mode.
 
-Live proof is pending: the phone USB connection and S60 at192.168.0.119 were
-unavailable while this build was prepared. b018 is signed but not installed;
-no real-device status or on-phone action test is claimed yet. Hardware recovery
-and TLS endpoints were both unreachable; credentials were never sent to HTTP.
+Live proof completed2026-11-16 after both devices were reconnected. b018 is
+installed on the iPhone. The real S60 reported app s60-bench v6/floor6, Relay OFF
+and Countdown idle/0s; all five control commands in the native probe were denied
+RC13. The focused physical-phone XCTest passed App status, Relay status and
+Countdown status taps, editor/recall preservation and session reset. Public phone
+results match the native probe. No firmware reflash or relay actuation was needed.
+Earlier preparation was blocked by disconnected devices; that blocker is cleared.
 
 ```
 clients/native/ios/tests/check.sh

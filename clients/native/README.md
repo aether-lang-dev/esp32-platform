@@ -37,7 +37,8 @@ Jump to latest, Previous/Next command recall with draft restoration, and a Done
 control on the code keyboard. The full physical-phone XCTest passed, including
 retaining a variable through125seconds idle, typing, cancellation and reset.
 
-Prepared b018 adds a Smart plug panel with named App status, Relay status and
-Countdown status actions through Rexx ADDRESS. Independent TLS and firmware
-permission checks pass; the signed build awaits phone installation and live
-S60 verification because both devices were unavailable. Control stays denied.
+Installed b018 adds a Smart plug panel with named App status, Relay status and
+Countdown status actions through Rexx ADDRESS. Independent TLS, firmware
+permission checks, live S60 validation and the physical-phone tap suite pass.
+Control stays denied. Fleet support is the next increment; see FLEET.md for
+per-device ownership and isolation acceptance checks.
