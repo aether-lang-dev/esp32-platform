@@ -34,7 +34,7 @@ measurements.
 
 It needs podman (or docker), a host C compiler and `make`, and sibling
 checkouts `../aether` and `../RexxAE`. The lane reads the exact Aether commit
-in `AETHER_REF` (v0.891.0) from the sibling repository with `git archive`
+in `AETHER_REF` (v0.931.0) from the sibling repository with `git archive`
 (or fetches a missing commit into a temporary bare repository),
 builds its compiler in a temporary directory, and uses that same snapshot's
 runtime. It does not use or modify the sibling's built compiler or working
@@ -166,7 +166,7 @@ both reject the run.
 Trusted teardown detaches the exhausted account before destroying the context
 and checks that the account holds zero bytes afterward.
 
-Runner targets require RexxAE commit `ef7a744` or a descendant for
+Runner targets require RexxAE commit `ce3b5ea` or a descendant for
 interruption cleanup. The standalone QEMU lane repeatedly trips both limits
 during parsing and execution, checks that internal free heap returns to its
 warmed baseline, then runs a healthy script. Signed delivery also checks
