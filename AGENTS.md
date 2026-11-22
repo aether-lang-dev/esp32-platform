@@ -47,8 +47,10 @@ make it look current. Inspect divergence before merging. Exact release/acceptanc
 worktrees intentionally stay pinned; current clones do not imply moving pins.
 
 `AETHER_REF` pins firmware source; `clients/native/ios/AETHER_TLS_REF` pins native
-TLS source. Bump pins with evidence and say whether a bump is tracking-only or
-requires a new API. Compiler, stdlib and runtime must agree. Set both `AE` and
+TLS source. The family re-pins on each new Aether release (no minimum-version
+support, no effort for older releases); other agents push those bumps to
+`origin/main`, so fetch before touching a pin. Verify with this repository's
+own lanes and say whether a bump is tracking-only or requires a new API. Compiler, stdlib and runtime must agree. Set both `AE` and
 `AETHERC` explicitly when PATH contains older installations; check `AETHER_HOME`
 and generated artifacts too. A runtime ABI change requires regenerating C from
 Aether sources and rebuilding, rather than relinking old generated C.
@@ -59,8 +61,16 @@ install FreeRTOS contexts before entering Aether, configure the required TLS
 slots, attach/detach other tasks that enter Aether, and keep actor work on the
 owning task. Do not assume host `std.net` support implies ESP-IDF support.
 
-Record upstream gaps in `asks/`; inspect sibling asks and `REPLY-` files before
-creating duplicates or carrying a private workaround past its upstream fix.
+Prefer fixing an upstream gap at its source over carrying a workaround. An
+ask goes in the UPSTREAM repository's `asks/<topic>.md` (motivation, repro,
+what is blocked); the answer is `asks/REPLY-<topic>.md` beside it. Inspect
+sibling asks and `REPLY-` files before creating duplicates or carrying a
+private workaround past its upstream fix. `aether` takes changes only by branch
+and pull request (never push its `main`, never force-push; several fixes are
+batched into one branch and one PR after a combined lab run; changelog entries
+are fragments from `make add-changelog`). Other family repositories take small
+verified commits straight to `main`. A private patch to a sibling is a draft
+for that upstream change, not something to pin against for long.
 
 ## Verification
 
@@ -85,6 +95,56 @@ Distinguish host tests, QEMU, cross-build/sign, phone installation and physical
 acceptance. One does not prove the others. Report failures and untested targets
 plainly. Preserve useful logs outside versioned source. Never treat an old build
 artifact or an earlier hardware run as evidence for a changed image.
+
+## The testing bar
+
+"It compiles" and "it ran once" are not evidence here.
+
+- A test written for a fix or a feature is run against the old code and seen
+  FAILING first; for security or protocol code also show a mutation failing
+  (the wrong label, the dropped check). Say in the commit that this was done.
+- Protocol and cryptography are tested against INDEPENDENT peers (OpenSSL
+  `s_server`, Python `ssl`, the firmware's mbedTLS in QEMU) and with negative
+  cases (wrong key, wrong identity, downgrade, a stalled or trickling peer),
+  not only our own two ends agreeing with each other.
+- Prefer real I/O (real sockets, real files, a real QEMU boot) to mocks. A
+  test that cannot run on a host skips with a stated reason; it never passes
+  silently.
+- A failure found on the way is fixed at its root, including one that looks
+  pre-existing. Do not park it as "known".
+- C and runtime changes get a sanitizer run (ASan/UBSan, TSan where threads
+  or tasks are involved).
+- Report exactly what ran, on which host, with counts, and what did not run.
+  Never write that a test passed unless that run happened on that tree.
+
+## Where tests run
+
+- Lab hosts come before GitHub Actions (minutes are tight); read
+  `~/scm/aether-cross-testing.md`. `cachyos` (x86_64) has
+  `docker.io/espressif/idf:v6.1` and `localhost/esp32-idf-psk-test`; the Mac's
+  podman machine holds arm64 copies. Work under `~/aether-lab/agents/<name>/`
+  on a lab host, with your own `AETHER_CACHE_DIR`; stop only processes you
+  started, by pid (no `pkill -f`, no `killall`). Scratch on the Mac goes on
+  `/Volumes/Mini3`.
+- Nothing that opens an app window runs unattended on the Mac desktop, and
+  nothing that raises a macOS permission prompt (Keychain, local network,
+  device access) runs without Paul present: those hang at 0% CPU behind a
+  hidden dialog. UI suites run on a Linux lab host under a virtual display;
+  phone and Keychain tests are attended runs, and say so.
+- Docs-only commits carry `[skip actions]`. Poll GitHub at most every three
+  minutes; the API quota is shared by every agent.
+
+## Design rules shared across the family
+
+- Complete moves and renames in one change: update callers, documentation and
+  tests, check the result, then delete old names. This project currently has
+  one user; do not retain compatibility aliases or shims for hypothetical users.
+- No shared mutable global state: an instance owns its state and it is passed
+  explicitly. Do not replace one global with a keyed global.
+- A new Aether UI capability is implemented for real on every backend (GTK4,
+  AppKit, Win32, UIKit), not stubbed on some.
+- Code under `~/scm/not-ours` is for ideas only, apart from the exceptions
+  recorded in `PROVENANCE.md`.
 
 ## Credentials and hardware
 
@@ -112,6 +172,13 @@ check each source and dependency's actual license, retain original copyright
 and license notices (including 0BSD), and record source path, revision and
 adaptation. Do not port LGPL components. Tasmota recovery firmware on a device
 does not establish permission to copy its implementation into this repository.
+
+This checkout is `aether-lang-dev/esp32-platform`. The workspace default
+(`../AGENTS.md`) is small verified commits pushed straight to `main`; the
+user's current instruction still governs. A long unpushed stack drifts from
+`origin/main`, which other agents advance: fetch often, and tell the user how
+far ahead and behind the checkout is when reporting. End a commit message with
+a `Co-Authored-By:` trailer naming the model that wrote it.
 
 Follow the user's current commit/push instructions. When commits are authorized,
 make small coherent commits with relevant validation; never sweep unrelated
