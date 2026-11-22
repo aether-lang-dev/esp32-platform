@@ -39,7 +39,7 @@ IMAGE="${ESP32_IDF_IMAGE:-docker.io/espressif/idf:v6.1}"
 # Use one release for both the compiler and the runtime, without changing
 # the sibling checkout. AETHER_REF is an explicit development override.
 AETHER_REF="${AETHER_REF:-$(cat "$HERE/AETHER_REF")}"
-AETHER_WANT="0.935.0"
+AETHER_WANT="0.936.0"
 TARGET="${ESP32_TARGET:-esp32s3}"
 case "$TARGET" in
     esp32s3|esp32s3-no-psram|esp32) ;;

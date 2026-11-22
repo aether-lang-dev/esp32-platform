@@ -34,7 +34,7 @@ measurements.
 
 It needs podman (or docker), a host C compiler and `make`, and sibling
 checkouts `../aether` and `../RexxAE`. The lane reads the exact Aether commit
-in `AETHER_REF` (v0.935.0) from the sibling repository with `git archive`
+in `AETHER_REF` (v0.936.0) from the sibling repository with `git archive`
 (or fetches a missing commit into a temporary bare repository),
 builds its compiler in a temporary directory, and uses that same snapshot's
 runtime. It does not use or modify the sibling's built compiler or working
