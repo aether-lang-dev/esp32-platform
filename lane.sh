@@ -39,7 +39,7 @@ IMAGE="${ESP32_IDF_IMAGE:-docker.io/espressif/idf:v6.1}"
 # Use one release for both the compiler and the runtime, without changing
 # the sibling checkout. AETHER_REF is an explicit development override.
 AETHER_REF="${AETHER_REF:-$(cat "$HERE/AETHER_REF")}"
-AETHER_WANT="0.891.0"
+AETHER_WANT="0.936.0"
 TARGET="${ESP32_TARGET:-esp32s3}"
 case "$TARGET" in
     esp32s3|esp32s3-no-psram|esp32) ;;
@@ -119,8 +119,8 @@ esac
 case " $want " in
     *" runner "*|*" runner-http "*|*" runner-signed "*|*" runner-signed-psk "*|*" runner-cyd-wifi "*|*" runner-cyd-usb "*)
         # RexxAE must release allocations on memory and deadline interruptions.
-        if ! git -C "$REXXAE_DIR" merge-base --is-ancestor ef7a744ef8cb1076224159b76c4d8488354fee57 HEAD; then
-            echo "[FAIL] runner requires RexxAE ef7a744 or a descendant"
+        if ! git -C "$REXXAE_DIR" merge-base --is-ancestor ce3b5ea5add4b04ae497b1bd54e5bceb4e6099cd HEAD; then
+            echo "[FAIL] runner requires RexxAE ce3b5ea or a descendant"
             exit 1
         fi ;;
 esac
