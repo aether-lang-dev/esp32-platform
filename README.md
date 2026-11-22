@@ -1,35 +1,97 @@
-# esp32: Aether and RexxAE on ESP32 and ESP32-S3
+# ESP32 platform: Aether firmware and scriptable device apps
 
-Repository layout: device firmware is in `firmware/esp-idf`, the working web
-controller in `clients/web`, and the Aether UI client foundation in
-`clients/native`. See [repository boundaries](docs/REPOSITORY.md). Legacy
-`project/` and `controller/` paths remain compatible during migration.
+An experimental device platform built with [Aether](https://github.com/aether-lang-dev/aether)
+and [RexxAE](https://github.com/aether-lang-dev/RexxAE). Aether compiles to C,
+which ESP-IDF builds into firmware. The firmware embeds RexxAE so small Rexx
+apps can be installed and replaced independently of the base firmware.
 
-Experimental work towards a "runner" firmware: an ESP32-S3 that takes Rexx
-scripts over the air and runs them with RexxAE, the embeddable Rexx engine
-written in Aether (`../RexxAE`). The target board is a Guition JC3248W535C
-(ESP32-S3-N16R8: 16 MB quad flash, 8 MB octal PSRAM, AXS15231B QSPI display;
-the display is not used yet). Until the board arrives, everything runs in
-Espressif's QEMU.
+The platform owns hardware and authority. Apps receive explicit grants for
+host services, with bounded execution, cancellation and update rollback.
+Rexx `ADDRESS` commands provide scriptable interfaces to native services and
+managed apps. RexxAE itself remains a headless, general-purpose engine;
+board and controller features live here.
 
-This first step proves the toolchain path and measures the engine:
+This has progressed beyond the initial QEMU benchmark: development includes
+a physical Sonoff S60TPG smart plug, a Freenove FNK0114B display/touch board,
+and local web and iPhone controllers. It is a development platform, not a
+finished retail firmware or a claim of complete smart-plug hardware support.
 
-1. Aether's `hello` builds and boots on the S3.
-2. RexxAE's engine, compiled to C by `aetherc --emit=lib`, links into
-   ESP-IDF firmware with a C host (`project/main/rexx_host.c`) on its step
-   API, and runs two scripts: `scripts/demo.rexx` (SAY, a registered host
-   FUNCTION round trip, a DO loop, a 4-instruction budget so the step API
-   returns RUNNABLE) and `scripts/bench.rexx` (~100 lines: routines,
-   SELECT, PARSE, string builtins, nested loops, host calls), timed.
-3. The host prints heap, stack and timing figures, then runs 50 more
-   create/run/destroy cycles with one script and 50 with a different source
-   each time, to find what a long-running runner would accumulate.
-4. `runner` loads a separate flash-resident script, yields between engine
-   steps and suspends/resumes timer calls, with denial/cancellation checks.
+The status below includes validated local development. Some S60 firmware,
+toolchain integration and layout-cleanup changes are still uncommitted; the
+published checkout does not yet reproduce every result described here. The
+controller/service commit history has been published separately.
 
-It is modelled on aether's own `make ci-esp32` lane (`tests/esp32/`), which
-targets the plain ESP32. This lane adds S3 configurations, C hosts, a flash script store and
-measurements.
+## Current capabilities and limits
+
+- **Signed apps:** P-256/SHA-256 bundles, explicit grants, trial activation,
+  persistent rollback and a version floor rejecting replayed releases.
+  Host tools support watch and per-device fleet synchronization.
+- **Local management:** TLS 1.3 external PSK for the signed PSK and S60 profiles.
+  The interactive Rexx session preserves variables between successful commands,
+  streams output and supports cancellation/reset independently of the installed
+  app's lifecycle. Keys and signing credentials are owner-managed.
+- **Scriptable services:** granted `ADDRESS APPS` inventory/run/service calls,
+  session-owned `ADDRESS SWITCH` leases, and native `ADDRESS OUTLET` countdowns
+  with their own lifecycle. An OUTLET countdown can continue after the console
+  session closes; cancellation and expiry are explicit service operations.
+- **S60TPG hardware:** ESP32-C3 relay/button operation, relay off at startup,
+  bounded timed control and physical return to retained Tasmota Safeboot have
+  been exercised. This is the plain S60TPG; the BK7238 S60TPG-M Matter model
+  is a different target and is not supported by this ESP32 firmware.
+  Complete power-metering/calibration support is not claimed.
+- **Display/touch hardware:** the Freenove FNK0114B has a Rexx console display,
+  touch-driven controls and signed USB app delivery. Its Wi-Fi join issue
+  remains separate from the working S60 Wi-Fi path.
+- **Controllers:** `clients/web` is a local Datastar-based web controller with
+  a PSK transport adapter. `clients/native` is an Aether UI/UIKit iPhone
+  prototype with local-only Keychain credentials, a console and named actions.
+  The phone currently targets one device; native fleet management, QR/person
+  enrollment and independently hot-loaded Aether apps remain roadmap work.
+
+The normal S60 runner has no plaintext HTTP management fallback. Retained
+Safeboot has its own HTTP upload interface when recovery is entered.
+Separate unsigned HTTP profiles exist for development/QEMU. The web controller
+itself currently uses loopback HTTP without a user login; it is a local
+functional-development tool, not a remotely secured management portal.
+
+## Latest validation — 2026-11-22
+
+Aether source is pinned to release **0.936.0**; compiler, generated C and runtime
+must match. The ESP32-C3 QEMU hello, RexxAE and signed-PSK lanes passed against
+the source-identical prerelease snapshot, including fleet retry and rollback.
+After completing the repository layout move, a fresh release-pinned C3 hello
+build and QEMU boot also passed. Older target measurements below retain their
+original dates; they are not fresh acceptance results for every target.
+
+The published 0.936.0 compiler passed eight independent synthetic native TLS
+transport cases: success, wrong key, redirect, oversized length, truncated body,
+chunked framing, silent peer and slow-trickle peer. Both stalled cases respect
+one ten-second absolute deadline. The release-built Mac client reached the
+physical S60 and reported installed app v6/version floor 6.
+
+The b020 iPhone app built, signed and installed, but its latest read-only named
+status test failed with a connection error while the app stayed open. Physical
+phone acceptance on this build is therefore outstanding. Earlier phone console
+and named-action work does not establish that the current build has passed.
+
+## Repository and starting points
+
+- `firmware/esp-idf/`: flashable firmware, host services and device tests.
+- `firmware/ci/` and `lane.sh`: isolated ESP-IDF builds and QEMU lanes.
+- `clients/web/`: [local web controller](clients/web/README.md).
+- `clients/native/`: [native client](clients/native/README.md),
+  [iPhone build/transport checks](clients/native/ios/README.md) and
+  [native fleet roadmap](clients/native/FLEET.md).
+- `scripts/`: deployable Rexx examples and service peers; `tools/`: host tools.
+- [PLAN.md](PLAN.md): roadmap and historical milestones.
+- [SIGNING.md](SIGNING.md): signed delivery and rollback policy.
+- [REPL protocol](firmware/esp-idf/REPL.md): console and service contracts.
+- [PROVENANCE.md](PROVENANCE.md): reused-source attribution and licenses.
+
+See [repository boundaries](docs/REPOSITORY.md). Use canonical paths in commands
+and scripts. The local layout cleanup removes the old root aliases; publishing
+that cleanup is a separate implementation change. Original repository code
+is [MIT](LICENSE); reused material retains its own notices and terms.
 
 ## Running it
 
@@ -46,7 +108,7 @@ runtime. It does not use or modify the sibling's built compiler or working
 tree. The first housekeeping run found a 0.875.0 compiler beside 0.877.0
 sources; rebuilding the pinned snapshot avoids that mismatch.
 
-ESP-IDF 6.1, the Xtensa toolchain and Espressif's QEMU come from
+ESP-IDF 6.1, the Xtensa and RISC-V toolchains and Espressif's QEMU come from
 `docker.io/espressif/idf:v6.1`; nothing ESP-specific is installed on the host.
 Each program gets a fresh IDF build and configuration inside the container.
 Project files, scripts and the container entry script are copied before
@@ -58,10 +120,65 @@ ESP32_TARGET=esp32 ./lane.sh hello rexxae runner
 ESP32_TARGET=esp32s3-no-psram ./lane.sh hello rexxae runner
 ```
 
-`ESP32_TARGET` selects `project/sdkconfig.<target>`: S3 with 8 MB octal
+`ESP32_TARGET` selects `firmware/esp-idf/sdkconfig.<target>`: S3 with 8 MB octal
 PSRAM and 16 MB flash (default), S3 with PSRAM disabled and 16 MB flash,
 or plain ESP32 with PSRAM disabled and 4 MB flash. The benchmark's heap
 measurements are printed on every target.
+
+The ESP32-C3 target runs the hello and RexxAE engine profiles:
+
+```sh
+ESP32_TARGET=esp32c3 ./lane.sh hello rexxae
+```
+
+Verified in QEMU on 2026-11-13 against Aether 0.891.0 and RexxAE
+`ce58d42`: hello firmware 159,872 bytes, RexxAE firmware 341,552 bytes,
+no PSRAM. Both sets of 50 engine cycles returned to the same free heap.
+The ESP32-C3 uses the RISC-V compiler and emulator.
+The signed PSK delivery profile also selects the C3 emulator for its upload,
+rollback, power-cut and fleet tests:
+
+```sh
+ESP32_TARGET=esp32c3 ESP32_IDF_IMAGE=localhost/esp32-idf-psk-test \
+  ./lane.sh runner-signed-psk
+ESP32_TARGET=esp32c3 ./lane.sh runner-s60-wifi
+```
+
+The headless `runner-s60-wifi` profile retains Tasmota's installed S60
+partition table, bootloader and Safeboot. Its application occupies `app0`
+at 0xe0000. It checks the installed layout before using bounded regions of
+the existing `spiffs` partition for two 64 KiB script slots and a separate
+24 KiB NVS store. Tasmota's settings region at 0x9000 stays available to
+Safeboot. Back up the entire filesystem and settings before deployment,
+because the runner's data replaces filesystem contents.
+
+The profile releases GPIO4's output hold and drives the relay low before
+network startup. Holding GPIO9 low for five seconds, then releasing it, selects retained
+Safeboot and restarts the plug. Failed storage initialization or Wi-Fi
+startup also attempts recovery. Safeboot serves its original HTTP firmware
+upload page while recovery is active. Keep the plug on a trusted LAN
+during recovery.
+
+For a private hardware build, set `S60_PROVISION_HEADER` to a private C
+header defining byte arrays `s60_wifi` and `s60_psk`, containing records
+created by `tools/rexx_wifi.py` and `tools/rexx_psk.py`. The public signing
+key, Wi-Fi details and TLS secret are embedded in that per-device firmware.
+Keep its build outputs private. Upload only the retained
+`out/runner-s60-wifi.app.bin` through Safeboot's application updater.
+The merged flash image belongs to QEMU and includes a development bootloader.
+
+Verified 2026-11-13 on an S60TPG, ESP32-C3 v0.4, after Firmware Liberator
+2.3.0 converted stock 1.2.0 to Tasmota 16.0.0: PSK TLS status, signed Rexx
+activation, wrong-key rejection, unsigned-source rejection, replay
+rejection and invalid-signature rejection. A syntax error and an ungranted
+HTTP call both rolled back to the previous app. Healthy v4 then activated.
+The C3 signed PSK QEMU lane also passed delivery, power-cut and fleet
+checks. `firmware/esp-idf/test_s60_layout.py` checks that mismatched Safeboot,
+application and filesystem partition labels are refused with data intact.
+The physical recovery-button check passed: the retained Safeboot appeared on
+the LAN, the runner was reinstalled, and signed v4 and its replay floor
+survived. The reinstalled version waits for button release before restarting.
+Run `python3 firmware/esp-idf/test_s60_button.py` for the compiled button-task test.
 
 Set `ESP32_KEEP=/path/to/results` to retain generated C, the staged project
 and scripts, compiler/build/size/console logs, revision metadata and ELFs.
@@ -253,7 +370,7 @@ disposable copies. The watcher needs Python 3.13 or newer with
 with a PSK-capable Python and use it for the lane.
 
 ```sh
-podman build -t localhost/esp32-idf-psk-test project/psk-test
+podman build -t localhost/esp32-idf-psk-test firmware/esp-idf/psk-test
 ESP32_IDF_IMAGE=localhost/esp32-idf-psk-test ESP32_TARGET=esp32 \
   ./lane.sh runner-signed-psk
 ```
@@ -295,7 +412,7 @@ a desktop program against `../RexxAE/build/librexxae.dylib`:
 ```sh
 cd scripts && xxd -i -n demo_rexx demo.rexx > /tmp/demo_rexx.h \
            && xxd -i -n bench_rexx bench.rexx > /tmp/bench_rexx.h
-cc -std=c11 -I../../RexxAE/include -I/tmp ../project/main/rexx_host.c \
+cc -std=c11 -I../../RexxAE/include -I/tmp ../firmware/esp-idf/main/rexx_host.c \
    -L../../RexxAE/build -lrexxae -Wl,-rpath,$PWD/../../RexxAE/build -o /tmp/host
 ```
 
@@ -445,7 +562,7 @@ Use a classic ESP32 board that exposes those pins.
 The [HTTP body counter](scripts/toit/http.ae) runs on desktop Aether.
 Set `TOIT_HTTP_URL` and run `ae run scripts/toit/http.ae`. To test against a
 local server, build with `ae build scripts/toit/http.ae -o /tmp/toit-http`
-and run `python3 project/test_toit_http.py /tmp/toit-http`.
+and run `python3 firmware/esp-idf/test_toit_http.py /tmp/toit-http`.
 
 The [pulse-counter port](scripts/toit/pulse_counter.rexx) reads five samples
 at 500 ms intervals. In the wired build, connect output GPIO 5 to input
@@ -586,6 +703,38 @@ python3.13 tools/rexx watch scripts/examples/maintenance_window.rexx --once \
   --private-key fleet.pem --key-id fleet-dev --name cyd-demo
 ```
 
+The screen distinguishes discovery, security negotiation and DHCP
+failures. A definite failed join can display the SSID for a new station
+credential pair. The firmware hides the name during connection and
+after any prior successful or interrupted attempt with that exact pair.
+USB serial reports the disconnect reason and whether the screen showed
+the name.
+
+The board stores keyed credential tags in NVS before attempting a join.
+A definite failure before successful association releases the entry.
+The board keeps remembered entries when the history fills and hides
+all station SSIDs in that case. If the history cannot be read or a new
+reservation cannot be saved, station setup fails without showing the
+SSID. The board can display its own advertised SSID in access-point mode.
+
+#### Use the CYD as a Wi-Fi access point
+
+On a CYD already running the signed Wi-Fi image, create a private
+`ap.json` with the board's own `ssid` and a unique WPA2 passphrase in
+`password`. Write a new Wi-Fi record in access-point mode:
+
+```sh
+python3 tools/rexx_wifi.py --access-point ap.json fleet-public.pem fleet-dev cyd-ap.bin
+esptool --chip esp32 --port /dev/cu.usbserial-110 write_flash 0x331000 cyd-ap.bin
+```
+
+Join the board's 2.4 GHz network and use the signed watch command above
+with `https://192.168.4.1` as the device origin. The Wi-Fi passphrase and
+TLS PSK are separate credentials. The board gives clients local IP
+addresses and runs the signed PSK TLS endpoint. It does not provide
+Internet access. Reflash the station credential record at the same
+offset to switch back to router enrolment.
+
 ### Signed USB runner for the FNK0114B
 
 ```sh
@@ -652,7 +801,7 @@ script and deploy again over USB. The app's hit testing can be exercised
 against a native RexxAE library.
 
 ```sh
-python3 project/test_cyd_buttons.py ../RexxAE/build/librexxae.dylib
+python3 firmware/esp-idf/test_cyd_buttons.py ../RexxAE/build/librexxae.dylib
 ```
 
 The [three-button Rexx example](scripts/examples/signed_layout.rexx) uses
@@ -677,10 +826,29 @@ function remains available for existing scripts.
 Run the host geometry test from the repository root.
 
 ```sh
-cc -std=c11 -Wall -Wextra -Werror -DRUNNER_USB -Iproject/main \
-  project/test_cyd_layout.c project/main/cyd_layout.c -o /tmp/test-cyd-layout
+cc -std=c11 -Wall -Wextra -Werror -DRUNNER_USB -Ifirmware/esp-idf/main \
+  firmware/esp-idf/test_cyd_layout.c firmware/esp-idf/main/cyd_layout.c -o /tmp/test-cyd-layout
 /tmp/test-cyd-layout
 ```
+
+### Watch a signed Rexx app over USB
+
+```sh
+python3 tools/rexx_usb.py watch scripts/examples/signed_switch.rexx \
+  --port /dev/cu.usbserial-110 --private-key fleet.pem --key-id fleet-dev \
+  --name cyd-demo --grant TOUCH_EVENT --grant DISPLAY_BUTTONS \
+  --grant SWITCH_CONTROL --grant SETTINGS_READ
+```
+
+Watch keeps the serial port open, streams firmware and Rexx logs to stderr,
+and signs the initial file and each stable edit. An activation or rollback
+receipt is printed to stdout. A rejected edit is attempted once. Save a
+correction to continue, or use `--once` for a single signed attempt.
+
+If a receipt is lost, watch stops and reports that the outcome is unknown.
+After reconnecting, use `rexx_usb.py status --port …` to check the device's
+active version and version floor before restarting. Use one serial client
+at a time.
 
 ### Signed Rexx-to-Rexx ADDRESS on the CYD
 
@@ -733,9 +901,9 @@ Run the native peer test from the repository root with a built RexxAE
 library and the matching Aether headers. On macOS:
 
 ```sh
-cc -std=gnu11 -Wall -Wextra -Werror -Iproject/main \
+cc -std=gnu11 -Wall -Wextra -Werror -Ifirmware/esp-idf/main \
   -I../aether/include -I../RexxAE/include \
-  project/test_runner_peer.c project/main/runner_peer.c \
+  firmware/esp-idf/test_runner_peer.c firmware/esp-idf/main/runner_peer.c \
   -L../RexxAE/build -lrexxae -Wl,-rpath,"$PWD/../RexxAE/build" \
   -o /tmp/test-runner-peer
 /tmp/test-runner-peer
@@ -768,8 +936,8 @@ refresh the display. The load is firmware state and resets to off on reboot.
 Run the switch policy test from the repository root.
 
 ```sh
-cc -std=c11 -Wall -Wextra -Werror -Iproject/main \
-  project/test_runner_switch.c project/main/runner_switch.c -o /tmp/test-runner-switch
+cc -std=c11 -Wall -Wextra -Werror -Ifirmware/esp-idf/main \
+  firmware/esp-idf/test_runner_switch.c firmware/esp-idf/main/runner_switch.c -o /tmp/test-runner-switch
 /tmp/test-runner-switch
 ```
 
@@ -800,8 +968,8 @@ change the stored setting. The committed value survives reboot and app
 replacement. Only the one named setting is exposed.
 
 ```sh
-cc -std=c11 -Wall -Wextra -Werror -Iproject/main \
-  project/test_runner_settings.c project/main/runner_settings.c -o /tmp/test-runner-settings
+cc -std=c11 -Wall -Wextra -Werror -Ifirmware/esp-idf/main \
+  firmware/esp-idf/test_runner_settings.c firmware/esp-idf/main/runner_settings.c -o /tmp/test-runner-settings
 /tmp/test-runner-settings
 ```
 
@@ -827,7 +995,7 @@ It checks that a second owner cannot claim, change or release the output,
 and that release drives it off before another owner can claim it.
 
 ```sh
-cc -std=c11 -Wall -Wextra -Werror -Iproject/main \
-  project/test_runner_switch_output.c project/main/runner_switch.c -o /tmp/test-runner-switch-output
+cc -std=c11 -Wall -Wextra -Werror -Ifirmware/esp-idf/main \
+  firmware/esp-idf/test_runner_switch_output.c firmware/esp-idf/main/runner_switch.c -o /tmp/test-runner-switch-output
 /tmp/test-runner-switch-output
 ```
