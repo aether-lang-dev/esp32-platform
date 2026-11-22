@@ -672,11 +672,24 @@ static char *load_script(void) {
     return source;
 }
 
+/* The parse case must reach the memory cap with little work, or it races the
+ * runner's five-second deadline instead of testing the cap. 1800 lines of
+ * x=1 reached 128 KiB only after 6.8 s of emulated time on a lab host (2.5 s
+ * even at an instruction-counted 250 MIPS), so the deadline passed first and
+ * was rightly reported. One long literal is copied a few times while the
+ * script is parsed and trips the cap inside create after a few block copies.
+ * It is longer than SCRIPT_LIMIT, which the delivery paths enforce and
+ * runner_execute does not. Cleanup at every cut point of a dense parse is
+ * covered on the host by RexxAE's tests/test_resource_cleanup.py. */
+#define QUOTA_LITERAL (24u * 1024u)
+
 static bool quota_self_test(void) {
-    char *parse = malloc(7208);
+    static const char head[] = "x = '", tail[] = "'\nEXIT 0\n";
+    char *parse = malloc(sizeof head - 1 + QUOTA_LITERAL + sizeof tail);
     if (!parse) return false;
-    for (unsigned i = 0; i < 1800; ++i) memcpy(parse + 4 * i, "x=1\n", 4);
-    memcpy(parse + 7200, "EXIT 0\n", 8);
+    memcpy(parse, head, sizeof head - 1);
+    memset(parse + sizeof head - 1, 'x', QUOTA_LITERAL);
+    memcpy(parse + sizeof head - 1 + QUOTA_LITERAL, tail, sizeof tail);
     const char *copies = "SAY LENGTH(COPIES(\"0123456789\",30000))\nEXIT 0\n";
     RunnerStats stats;
     size_t baseline = 0;
