@@ -111,6 +111,8 @@ want="${*:-hello rexxae}"
 qemu_timeout="${QEMU_TIMEOUT:-120}"
 case " $want " in
     *" runner-signed-psk "*) qemu_timeout="${QEMU_TIMEOUT:-240}" ;;
+    # The Toit Mandelbrot check alone can take 50 s of wall time on a busy host.
+    *" runner "*) qemu_timeout="${QEMU_TIMEOUT:-240}" ;;
 esac
 case " $want " in
     *" runner-http "*|*" runner-signed "*|*" runner-signed-psk "*|*" runner-cyd-wifi "*|*" runner-cyd-usb "*|*" psk-probe "*)

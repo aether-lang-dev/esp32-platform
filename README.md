@@ -84,6 +84,7 @@ and named-action work does not establish that the current build has passed.
   [native fleet roadmap](clients/native/FLEET.md).
 - `scripts/`: deployable Rexx examples and service peers; `tools/`: host tools.
 - [PLAN.md](PLAN.md): roadmap and historical milestones.
+- [TODO.md](TODO.md): known shortcuts to dig into later.
 - [SIGNING.md](SIGNING.md): signed delivery and rollback policy.
 - [REPL protocol](firmware/esp-idf/REPL.md): console and service contracts.
 - [PROVENANCE.md](PROVENANCE.md): reused-source attribution and licenses.

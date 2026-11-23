@@ -32,6 +32,11 @@ typedef struct {
     unsigned logs;
     bool cancelled;
 } RunnerStats;
+/* Limits for one runner_execute call; passed explicitly, never global. */
+typedef struct {
+    unsigned step_limit;
+    int64_t deadline_us;
+} RunnerBudget;
 #ifdef RUNNER_PSK
 typedef int (*RunnerAppsCommand)(const char *command, unsigned grants, char *result);
 typedef struct {
@@ -47,6 +52,10 @@ void runner_session_close(RunnerSession *session);
 
 /* Called from the runner task only; source is copied by the engine. */
 int runner_execute(const char *source, unsigned grants, RunnerStats *stats);
+#ifndef RUNNER_HTTP
+/* As runner_execute, with the caller's budget instead of the default. */
+int runner_execute_budget(const char *source, unsigned grants, RunnerStats *stats, const RunnerBudget *budget);
+#endif
 #ifdef RUNNER_USB
 const char *runner_labels_source(void);
 int runner_execute_touch(const char *source, unsigned grants, RunnerStats *stats, const CydTouch *tap, uint32_t version);
