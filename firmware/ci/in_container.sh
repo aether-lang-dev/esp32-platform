@@ -5,8 +5,11 @@
 # QEMU stops when app_main returns, a panic is printed, or QEMU_TIMEOUT elapses.
 set -eu
 . "$IDF_PATH/export.sh" > /dev/null 2>&1
-Q=$(ls -d "$IDF_TOOLS_PATH"/tools/qemu-xtensa/*/qemu/bin | head -1)
-"$Q/qemu-system-xtensa" --version | head -1 > /out/qemu.version
+qemu_arch=xtensa
+[ "${ESP32_TARGET:-esp32s3}" != esp32c3 ] || qemu_arch=riscv32
+Q=$(ls -d "$IDF_TOOLS_PATH"/tools/qemu-"$qemu_arch"/*/qemu/bin | head -1)
+QEMU="$Q/qemu-system-$qemu_arch"
+"$QEMU" --version | head -1 > /out/qemu.version
 # Build dirs live in the container; sdkconfig is regenerated per run from
 # sdkconfig.defaults, so the mounted project stays read-only.
 cp -r /project /tmp/project
@@ -15,6 +18,7 @@ case "${ESP32_TARGET:-esp32s3}" in
     esp32s3) chip=esp32s3; flash=16MB; psram=yes ;;
     esp32s3-no-psram) chip=esp32s3; flash=16MB; psram=no ;;
     esp32) chip=esp32; flash=4MB; psram=no ;;
+    esp32c3) chip=esp32c3; flash=4MB; psram=no ;;
     *) echo "Unknown ESP32_TARGET" >&2; exit 1 ;;
 esac
 cp "sdkconfig.$ESP32_TARGET" sdkconfig.defaults
@@ -109,7 +113,7 @@ CONFIG
         cp build/flash.bin /out/runner.flash.bin
     fi
     if [ "$p" = psk-probe ]; then
-        if python3 /project/test_psk_probe.py "$Q/qemu-system-xtensa" build/flash.bin build/device.json > "/out/$p.log" 2>&1; then
+        if python3 /project/test_psk_probe.py "$QEMU" build/flash.bin build/device.json > "/out/$p.log" 2>&1; then
             echo 0 > "/out/$p.harness-status"
         else
             echo "$?" > "/out/$p.harness-status"
@@ -126,9 +130,9 @@ CONFIG
         [ "$signed" = no ] || set -- /tmp/signed-fixtures
         [ "$p" != runner-signed-psk ] || export REXX_TEST_PSK="$PWD/build/device.json"
         if [ "$p" = runner-signed-psk ]; then cp build/flash.bin build/fleet.bin; fi
-        if { "${REXX_TEST_PYTHON:-python3}" /project/test_http_delivery.py "$Q/qemu-system-xtensa" build/flash.bin "$@" &&
+        if { "${REXX_TEST_PYTHON:-python3}" /project/test_http_delivery.py "$QEMU" build/flash.bin "$@" &&
              { [ "$p" != runner-signed-psk ] ||
-               "${REXX_TEST_PYTHON:-python3}" /project/test_fleet_sync.py "$Q/qemu-system-xtensa" build/fleet.bin /tmp/signed-fixtures/fleet-current.pem; }; } \
+               "${REXX_TEST_PYTHON:-python3}" /project/test_fleet_sync.py "$QEMU" build/fleet.bin /tmp/signed-fixtures/fleet-current.pem; }; } \
                 > "/out/$p.log" 2>&1; then
             echo 0 > "/out/$p.harness-status"
         else
@@ -139,7 +143,7 @@ CONFIG
     fi
     # Python reads UART lines immediately and terminates QEMU after the return
     # marker. awk in the image block-buffers its input and used to stall here.
-    python3 - "$Q/qemu-system-xtensa" "$@" \
+    python3 - "$QEMU" "$@" \
         -drive file=build/flash.bin,if=mtd,format=raw -nic none \
         > "/out/$p.log" 2>&1 <<'PYTHON' || true
 import os

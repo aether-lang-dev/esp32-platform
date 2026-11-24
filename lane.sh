@@ -13,7 +13,7 @@
 #   AETHER_DIR   source repository holding the pinned release (default ../aether)
 #   AETHER_REF   explicit override of the committed AETHER_REF pin
 #                warns on a version mismatch; AETHER_STRICT=1 fails
-#   ESP32_TARGET esp32s3 (default), esp32s3-no-psram, or esp32
+#   ESP32_TARGET esp32s3 (default), esp32s3-no-psram, esp32, or esp32c3
 #   REXXAE_DIR   RexxAE checkout with quota cleanup     (default ../RexxAE)
 #   ESP32_IDF_IMAGE, ESP32_ENGINE   image / container engine
 #   ESP32_KEEP   where the run's generated C, logs and ELFs are copied after
@@ -42,7 +42,7 @@ AETHER_REF="${AETHER_REF:-$(cat "$HERE/AETHER_REF")}"
 AETHER_WANT="0.941.0"
 TARGET="${ESP32_TARGET:-esp32s3}"
 case "$TARGET" in
-    esp32s3|esp32s3-no-psram|esp32) ;;
+    esp32s3|esp32s3-no-psram|esp32|esp32c3) ;;
     *) echo "[FAIL] unknown ESP32_TARGET: $TARGET"; exit 1 ;;
 esac
 
