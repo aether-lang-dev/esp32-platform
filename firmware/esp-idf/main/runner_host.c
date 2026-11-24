@@ -34,7 +34,7 @@ _Static_assert(GPIO_IS_VALID_OUTPUT_GPIO(RUNNER_LED_GPIO), "LED pin must support
 
 #define STEP_BUDGET 32
 /* Every script runs under this unless its caller passes a budget explicitly. */
-#define MANDELBROT_DEADLINE_US 120000000
+#define MANDELBROT_DEADLINE_US 28000000
 static const RunnerBudget default_budget = { .step_limit = 2048, .deadline_us = 5000000 };
 #define RUNNER_MEMORY_LIMIT (128u * 1024u)
 
